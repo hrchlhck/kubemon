@@ -3,11 +3,11 @@ import time
 import csv
 import json
 import requests
-import platform
+import os
 
 
 class Monitor:
-    def __init__(self, interval=1, verbose=False):
+    def __init__(self, address, port, interval=1, verbose=False):
         self.__interval = interval
         self.__csv_header = [
             "cpu_usage",
@@ -21,8 +21,8 @@ class Monitor:
             "swap_enabled",
             "swap",
         ]
-        self.__hostname = platform.node()
         self.__verbose = verbose
+        self.__address = 'http://' + address + ':' + str(port)
 
     def __get_data(self):
         swap = psutil.swap_memory().percent
@@ -48,26 +48,23 @@ class Monitor:
         if not self.__verbose:
             print("Running on silent mode\n")
 
-        with open(self.__hostname + ".csv", mode="w", newline="") as f:
-            writer = csv.DictWriter(f, self.__csv_header)
-            writer.writeheader()
+        while True:
+            data = self.__get_data()
 
-            while True:
-                data = self.__get_data()
-                
-                time.sleep(self.__interval)
-                writer.writerow(data)
+            if self.__verbose:
+                print(f'\nCPU: {data["cpu_usage"]}')
+                print(f'Memory: {data["memory_usage"]}')
+                print(f'Disk read: {data["disk_read_bytes"]}')
+                print(f'Disk write: {data["disk_written_bytes"]}')
+                print(f'Net sent: {data["net_sent_bytes"]}')
+                print(f'Net received: {data["net_received_bytes"]}')
+                print(f'Net sent pkg: {data["net_sent_packets"]}')
+                print(f'Net received pkg: {data["net_received_packets"]}')
+                print(f'Swap enabled?: {data["swap_enabled"]}')
 
-                if self.__verbose:
-                    print(f'\nCPU: {data["cpu_usage"]}')
-                    print(f'Memory: {data["memory_usage"]}')
-                    print(f'Disk read: {data["disk_read_bytes"]}')
-                    print(f'Disk write: {data["disk_written_bytes"]}')
-                    print(f'Net sent: {data["net_sent_bytes"]}')
-                    print(f'Net received: {data["net_received_bytes"]}')
-                    print(f'Net sent pkg: {data["net_sent_packets"]}')
-                    print(f'Net received pkg: {data["net_received_packets"]}')
-                    print(f'Swap enabled?: {data["swap_enabled"]}')
-
-                    if data["swap_enabled"]:
-                        print(f"Swap: {data['swap']}")
+                if data["swap_enabled"]:
+                    print(f"Swap: {data['swap']}")
+                    
+            requests.post(self.__address, json=json.dumps(data))
+            
+            time.sleep(self.__interval)
