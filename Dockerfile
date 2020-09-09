@@ -10,4 +10,4 @@ COPY sys_monitor/ sys_monitor/
 COPY static/ .
 COPY main.py .
 
-CMD ["python3", "main.py"]
+ENTRYPOINT ["python3", "main.py"]

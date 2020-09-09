@@ -1,9 +1,7 @@
 import psutil
 import time
-import csv
 import json
 import requests
-import os
 
 
 class Monitor:
@@ -22,7 +20,7 @@ class Monitor:
             "swap",
         ]
         self.__verbose = verbose
-        self.__address = 'http://' + address + ':' + str(port)
+        self.__address = "http://" + address + ":" + str(port)
 
     def __get_data(self):
         swap = psutil.swap_memory().percent
@@ -64,7 +62,7 @@ class Monitor:
 
                 if data["swap_enabled"]:
                     print(f"Swap: {data['swap']}")
-                    
+
             requests.post(self.__address, json=json.dumps(data))
-            
+
             time.sleep(self.__interval)
