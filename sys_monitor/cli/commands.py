@@ -3,7 +3,7 @@ from ..collector import Collector
 
 
 def start_monitor(addr, port):
-    m = Monitor(addr, int(port))
+    m = Monitor(addr, int(port), verbose=True)
     m.start()
 
 

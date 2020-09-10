@@ -1,18 +1,28 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from os.path import join, isfile, isdir
+from os import getcwd, makedirs
 import json
 import csv
-from os import getcwd
-from os.path import join, isfile
 
 
-def save_csv(_dict):
+def create_dir(_dir):
+    if not isdir(_dir):
+        makedirs(_dir)
+    return _dir
+
+
+def save_csv(_dict, name):
     """ Saves a dict into a csv """
+
+    filename = str(name).replace(".", "_") + ".csv"
+    _dir = join(create_dir("data"), filename)
+
     mode = "a"
 
-    if not isfile("data.csv"):
+    if not isfile(_dir):
         mode = "w"
 
-    with open("data.csv", mode=mode, newline="") as f:
+    with open(_dir, mode=mode, newline="") as f:
         writer = csv.DictWriter(f, _dict.keys())
 
         if mode == "w":
@@ -34,7 +44,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         json_to_dict = json.loads(json.loads(post_data))
 
         print(json_to_dict)
-        save_csv(json_to_dict)
+        save_csv(json_to_dict, self.client_address[0])
 
         self.__set_response()
         self.wfile.write("POST request for {}\n".format(self.path).encode("utf-8"))
