@@ -2,11 +2,10 @@
 
 red='\033[0;31m'
 green='\033[0;32m'
-yellow='\033[0;33m'
 plain='\033[0m'
 installer="[${green} INSTALLER ${plain}]"
 
-[[ $EUID -ne 0 ]] && echo -e "[${red}Error${plain}] This script must be run as root" && exit 1
+[[ $EUID -ne 0 ]] && echo -e "[${red} ERROR ${plain}] This script must be run as root" && exit 1
 
 function install_docker {
     
