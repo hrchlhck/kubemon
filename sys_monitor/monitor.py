@@ -18,15 +18,18 @@ class Monitor:
         disk_io = psutil.disk_io_counters()
         net_io = psutil.net_io_counters()
         net_usage = net_usage = net_io.bytes_sent + net_io.bytes_recv
-        return {
+        data = {
             "cpu_usage": cpu,
             "memory_usage": mem,
             "disk_read_bytes": disk_io.read_bytes,
             "disk_written_bytes": disk_io.write_bytes,
             "net_usage": net_usage,
-            "swap_enabled": swap_enabled,
-            "swap": swap,
-        }
+        } 
+        
+        if swap_enabled:
+            data["swap"] = swap
+        
+        return data
 
     def start(self):
         if not self.__verbose:
@@ -53,9 +56,8 @@ class Monitor:
                 print(f'Disk read: {data["disk_read_bytes"]}')
                 print(f'Disk write: {data["disk_written_bytes"]}')
                 print(f'Net usage: {data["net_usage"]}')
-                print(f'Swap enabled?: {data["swap_enabled"]}')
 
-                if data["swap_enabled"]:
+                if data["swap"]:
                     print(f"Swap: {data['swap']}")
 
             requests.post(self.__address, json=json.dumps(data))
