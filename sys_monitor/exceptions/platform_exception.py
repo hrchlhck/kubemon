@@ -1,0 +1,2 @@
+class NotLinuxException(Exception):
+    pass
