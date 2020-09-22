@@ -1,65 +1,68 @@
+from .entities.cpu import CPU
+from .entities.disk import Disk
+from json import dumps
+from time import sleep
+from requests import post
 import psutil
-import time
-import json
-import requests
 
 
 class Monitor:
-    def __init__(self, address, port, interval=1, verbose=False):
+    def __init__(self, address, port, interval=5, verbose=False):
         self.__interval = interval
         self.__verbose = verbose
         self.__address = "http://" + address + ":" + str(port)
+        self.__cpu = CPU()
+        self.__disk = Disk()
 
     def __get_data(self):
-        swap = psutil.swap_memory().percent
-        swap_enabled = swap != 0
+        disk = self.__disk.get_info()
+        cpu = self.__cpu.get_info()
         mem = psutil.virtual_memory().percent
-        cpu = psutil.cpu_percent()
-        disk_io = psutil.disk_io_counters()
-        net_io = psutil.net_io_counters()
-        net_usage = net_usage = net_io.bytes_sent + net_io.bytes_recv
+        swap = psutil.swap_memory().used
+        swap_enabled = swap != 0
         data = {
             "cpu_usage": cpu,
             "memory_usage": mem,
-            "disk_read_bytes": disk_io.read_bytes,
-            "disk_written_bytes": disk_io.write_bytes,
-            "net_usage": net_usage,
-        } 
-        
+            "dsk_sectors_rd": disk["sectors_read"],
+            "dsk_sectors_wrt": disk["sectors_written"],
+        }
+
         if swap_enabled:
             data["swap"] = swap
-        
+
         return data
 
     def start(self):
         if not self.__verbose:
             print("Running on silent mode\n")
 
-        prev_net = 0
-        total_net = 0
+        data = self.__get_data()
+        cpu_usage = data["cpu_usage"]
+        memory_usage = data["memory_usage"]
+        disk_read_avg = data["disk_read_avg"]
 
         while True:
             data = self.__get_data()
 
-            actual_net = data["net_usage"]
+            cpu_new = data["cpu_usage"]
+            memory_new = data["memory_usage"]
+            disk_read_new = data["disk_read_avg"]
+            disk_write_new = data["disk_write_avg"]
 
-            if prev_net:
-                total_net = actual_net - prev_net
+            sleep(self.__interval)
 
-            prev_net = actual_net
-            
-            data["net_usage"] = total_net
+            cpu_usage = round(cpu_new - cpu_usage, 4)
+            memory_usage = round(memory_new - memory_usage, 4)
+            disk_read_avg = round(disk_read_new - disk_read_avg, 4)
+            disk_write_avg = round(disk_write_new - disk_write_avg, 4)
 
             if self.__verbose:
-                print(f'\nCPU: {data["cpu_usage"]}')
-                print(f'Memory: {data["memory_usage"]}')
-                print(f'Disk read: {data["disk_read_bytes"]}')
-                print(f'Disk write: {data["disk_written_bytes"]}')
-                print(f'Net usage: {data["net_usage"]}')
+                print(f"\nCPU: {cpu_usage}")
+                print(f"Memory: {memory_usage}")
+                print(f"Disk read: {disk_read_avg}")
+                print(f"Disk write: {disk_write_avg}")
 
-                if data["swap"]:
+                if "swap" in data.keys():
                     print(f"Swap: {data['swap']}")
 
-            requests.post(self.__address, json=json.dumps(data))
-
-            time.sleep(self.__interval)
+            post(self.__address, json=dumps(data))
