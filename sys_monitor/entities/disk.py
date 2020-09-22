@@ -8,5 +8,5 @@ class Disk(BaseEntity):
 
     def __parse_data(self, path):
         with open(path, "r") as f:
-            data = re.findall(r"\d+", data.readlines()[0])
+            data = re.findall(r"\d+", f.readlines()[0])
             return {"sectors_read": data[3], "sectors_written": data[7]}
