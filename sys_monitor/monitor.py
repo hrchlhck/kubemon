@@ -1,65 +1,109 @@
-import psutil
-import time
+from requests.exceptions import ConnectionError
+from .entities.cpu import CPU
+from .entities.disk import Disk
+from .entities.network import Network
+from time import sleep
 import json
 import requests
+import psutil
 
 
 class Monitor:
-    def __init__(self, address, port, interval=1, verbose=False):
+    def __init__(self, address, port, interval=5, verbose=False):
         self.__interval = interval
         self.__verbose = verbose
-        self.__address = "http://" + address + ":" + str(port)
+        self.__address = f"http://{address}:{port}"
+        self.__cpu = CPU()
+        self.__disk = Disk()
+        self.__network = Network()
 
     def __get_data(self):
-        swap = psutil.swap_memory().percent
-        swap_enabled = swap != 0
+        disk = self.__disk.get_info()
+        cpu = self.__cpu.get_info(self.__interval)
+        net = self.__network.get_info()
         mem = psutil.virtual_memory().percent
-        cpu = psutil.cpu_percent()
-        disk_io = psutil.disk_io_counters()
-        net_io = psutil.net_io_counters()
-        net_usage = net_usage = net_io.bytes_sent + net_io.bytes_recv
+        swap = psutil.swap_memory().used
+        swap_enabled = swap != 0
         data = {
             "cpu_usage": cpu,
             "memory_usage": mem,
-            "disk_read_bytes": disk_io.read_bytes,
-            "disk_written_bytes": disk_io.write_bytes,
-            "net_usage": net_usage,
-        } 
-        
+            "dsk_sectors_rd": disk["sectors_read"],
+            "dsk_sectors_wrt": disk["sectors_written"],
+            "bytes_sent": net["bytes_sent"],
+            "bytes_recv": net["bytes_recv"],
+            "packets_sent": net["packets_sent"],
+            "packets_recv": net["packets_recv"],
+        }
+
         if swap_enabled:
             data["swap"] = swap
-        
+
         return data
+
+    def __calc_usage(self):
+        data = self.__get_data()
+
+        cpu_usage = data["cpu_usage"]
+        memory_usage = data["memory_usage"]
+        disk_read_avg = data["dsk_sectors_rd"]
+        disk_write_avg = data["dsk_sectors_wrt"]
+        bytes_sent = data["bytes_sent"]
+        bytes_recv = data["bytes_recv"]
+        packets_recv = data["packets_recv"]
+        packets_sent = data["packets_sent"]
+
+        sleep(self.__interval)
+        
+        data = self.__get_data()
+        cpu_new = data["cpu_usage"]
+        memory_new = data["memory_usage"]
+        disk_read_new = data["dsk_sectors_rd"]
+        disk_write_new = data["dsk_sectors_wrt"]
+        bytes_sent_new = data["bytes_sent"]
+        bytes_recv_new = data["bytes_recv"]
+        packets_recv_new = data["packets_recv"]
+        packets_sent_new = data["packets_sent"]
+
+        cpu_usage = round(cpu_new - cpu_usage, 4)
+        memory_usage = round(memory_new - memory_usage, 4)
+        disk_read_avg = round(disk_read_new - disk_read_avg, 4)
+        disk_write_avg = round(disk_write_new - disk_write_avg, 4)
+        bytes_recv = round(bytes_recv_new - bytes_recv, 4)
+        bytes_sent = round(bytes_sent_new - bytes_sent, 4)
+        packets_recv = round(packets_recv_new - packets_recv, 4)
+        packets_sent = round(packets_sent_new - packets_sent, 4)
+
+        return (cpu_usage, memory_usage, disk_read_avg, disk_write_avg, bytes_recv, bytes_sent, packets_recv, packets_sent)
 
     def start(self):
         if not self.__verbose:
             print("Running on silent mode\n")
 
-        prev_net = 0
-        total_net = 0
-
         while True:
-            data = self.__get_data()
+            temp = self.__calc_usage()
 
-            actual_net = data["net_usage"]
-
-            if prev_net:
-                total_net = actual_net - prev_net
-
-            prev_net = actual_net
-            
-            data["net_usage"] = total_net
+            data = {
+                "cpu_usage": temp[0],
+                "memory_usage": temp[1],
+                "disk_read_avg": temp[2],
+                "disk_write_avg": temp[3],
+                "bytes_recv": temp[4],
+                "bytes_sent": temp[5],
+                "packets_sent": temp[6],
+                "packets_recv": temp[7],
+            }
 
             if self.__verbose:
-                print(f'\nCPU: {data["cpu_usage"]}')
-                print(f'Memory: {data["memory_usage"]}')
-                print(f'Disk read: {data["disk_read_bytes"]}')
-                print(f'Disk write: {data["disk_written_bytes"]}')
-                print(f'Net usage: {data["net_usage"]}')
+                print(f"\nCPU: {temp[0]}")
+                print(f"Memory: {temp[1]}")
+                print(f"Disk sectors read: {temp[2]}")
+                print(f"Disk sectors written: {temp[3]}")
+                print(f"Net bytes sent: {temp[4]}")
+                print(f"Net bytes recv: {temp[5]}")
+                print(f"Net pkt sent: {temp[6]}")
+                print(f"Net pkt recv: {temp[7]}")
 
-                if data["swap"]:
-                    print(f"Swap: {data['swap']}")
-
-            requests.post(self.__address, json=json.dumps(data))
-
-            time.sleep(self.__interval)
+            try:
+                requests.post(self.__address, json=json.dumps(data))
+            except ConnectionError:
+                print('Connection refused.')

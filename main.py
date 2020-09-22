@@ -1,5 +1,5 @@
 from requests import exceptions
-from sys_monitor.cli.commands import *
+from sys_monitor.cli.commands import start_collector, start_monitor
 import sys
 
 if __name__ == "__main__":
@@ -12,12 +12,10 @@ if __name__ == "__main__":
     if len(args) > 1:
         try:
             if args[1] == "collector":
-                start_collector(args[2], args[3])
+                start_collector(args[2])
             elif args[1] == "monitor":
-                try:
-                    start_monitor(args[2], args[3])
-                except exceptions.ConnectionError:
-                    print("Connection refused")
+                start_monitor(args[2], args[3])
+                print("Connection refused")
             else:
                 print("Option doesn't exist")
         except KeyboardInterrupt:
