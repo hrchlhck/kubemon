@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY sys_monitor/ sys_monitor/
-COPY static/ .
+COPY static/ static/
 COPY main.py .
 
 ENTRYPOINT ["python3", "main.py"]
