@@ -1,4 +1,4 @@
-import sys
+from requests import get
 from operator import add
 from functools import wraps
 from pyspark.sql import SparkSession
@@ -16,9 +16,10 @@ def timeit(func):
 
 
 @timeit
-def word_count(spark, file):
-    lines = spark.read.text(file).rdd.map(lambda r: r[0])
-    counts = lines.flatMap(lambda x: x.split(' '))\
+def word_count(spark, url):
+    r = get(url).text
+    lines = spark.read.text(url).rdd.map(lambda r: r[0])
+    counts = lines.flatMap(lambda x: x.split('\n'))\
         .map(lambda x: (x, 1))\
         .reduceByKey(add)
     
@@ -26,18 +27,14 @@ def word_count(spark, file):
     
     sort = [(word, count) for word, count in output]
     sort = sorted(sort, key=lambda x: x[:][1])
-    print(sort)
+    print(f"Most used word: {sort[-1]}")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: wordcound <file>", file=sys.stderr)
-        sys.exit(-1)
-
     spark = SparkSession\
         .builder\
         .appName("PythonWordCount")\
         .getOrCreate()
     
-    word_count(spark, sys.argv[1])
+    word_count(spark, "https://raw.githubusercontent.com/mxw/grmr/master/src/finaltests/bible.txt")
     
     spark.stop()
