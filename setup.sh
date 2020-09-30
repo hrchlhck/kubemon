@@ -84,6 +84,7 @@ function uninstall_docker() {
     sudo apt-get purge docker docker-engine docker.io containerd runc -y
     sudo apt-get autoremove -y
     sudo apt-get update
+    rm -rf /opt/cni /opt/containerd
 }
 
 function uninstall_k8s() {

@@ -12,20 +12,20 @@ metadata:
     name: monitor-dpl
     labels:
         app: sys-monitor
-    spec:
-        replicas: $WORKER_COUNT
-        selector:
-            matchLabels:
+spec:
+    replicas: $WORKER_COUNT
+    selector:
+        matchLabels:
+            app: sys-monitor
+    template:
+        metadata:
+            labels:
                 app: sys-monitor
-        template:
-            metadata:
-                labels:
-                    app: sys-monitor
         spec:
             containers:
             - name: sys-monitor
-            image: vpemfh7/sys-monitor:latest
-            args: ["monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
-            ports:
-            - containerPort: $MONITOR_PORT
+              image: vpemfh7/sys-monitor:latest
+              args: ["monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
+              ports:
+              - containerPort: $MONITOR_PORT
 EOF
