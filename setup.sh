@@ -29,7 +29,8 @@ function install_docker {
     apt-get update && apt-get install -y \
     containerd.io=1.2.13-2 \
     docker-ce=5:19.03.11~3-0~ubuntu-$(lsb_release -cs) \
-    docker-ce-cli=5:19.03.11~3-0~ubuntu-$(lsb_release -cs)
+    docker-ce-cli=5:19.03.11~3-0~ubuntu-$(lsb_release -cs) \
+    docker-compose
     
     
     # Set up the Docker daemon
@@ -61,8 +62,8 @@ function install_k8s {
     nano /etc/fstab
     
     echo -e "${installer} Installing Kubernetes"
-    cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-ip6tables = 1
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf 
+net.bridge.bridge-nf-call-ip6tables = 1 
 net.bridge.bridge-nf-call-iptables = 1
 EOF
     sysctl --system
@@ -83,7 +84,6 @@ function uninstall_docker() {
     echo -e "${installer} Uninstalling docker"
     sudo apt-get purge docker docker-engine docker.io containerd runc -y
     sudo apt-get autoremove -y
-    sudo apt-get update
     rm -rf /opt/cni /opt/containerd
 }
 
@@ -91,7 +91,6 @@ function uninstall_k8s() {
     echo -e "${installer} Uninstalling Kubernetes"
     sudo apt-get purge kube* -y
     sudo apt-get autoremove -y
-    sudo apt-get update
 }
 
 function uninstall() {
@@ -106,3 +105,6 @@ function install() {
 
 uninstall
 install
+
+apt-get update -y
+apt-get upgrade -y
