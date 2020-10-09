@@ -1,8 +1,9 @@
-from requests import get
 from operator import add
 from functools import wraps
-from pyspark.sql import SparkSession
+from pyspark import SparkContext, SparkConf
 from time import perf_counter
+import sys
+
 
 def timeit(func):
     @wraps(func)
@@ -12,29 +13,28 @@ def timeit(func):
         t1 = perf_counter() - t0
         print(f"Time elapsed: {t1:.4f}")
         return r
-    return wrapper 
+    return wrapper
 
+class SparkTest(object):
+    def __init__(self, app_name):
+        self.__conf = SparkConf().setMaster("local").setAppName(app_name)
+        self.__spark = SparkContext(conf=self.__conf)
+    
+    @timeit
+    def word_count(self, file):
+        lines = self.__spark.textFile(file).flatMap(lambda line: line.split(" "))
+        counts = lines.map(lambda x: (x, 1)).reduceByKey(add)
+        output = counts.collect()
 
-@timeit
-def word_count(spark, url):
-    r = get(url).text
-    lines = spark.read.text(url).rdd.map(lambda r: r[0])
-    counts = lines.flatMap(lambda x: x.split('\n'))\
-        .map(lambda x: (x, 1))\
-        .reduceByKey(add)
+        sort = [(word, count) for word, count in output]
+        sort = sorted(sort, key=lambda x: x[:][1])
+        print(f"Most used word: {sort[-1]}")
     
-    output = counts.collect()
-    
-    sort = [(word, count) for word, count in output]
-    sort = sorted(sort, key=lambda x: x[:][1])
-    print(f"Most used word: {sort[-1]}")
 
 if __name__ == "__main__":
-    spark = SparkSession\
-        .builder\
-        .appName("PythonWordCount")\
-        .getOrCreate()
-    
-    word_count(spark, "https://raw.githubusercontent.com/mxw/grmr/master/src/finaltests/bible.txt")
-    
-    spark.stop()
+    if len(sys.argv) != 2:
+        print("Usage: wordcount <file>", file=sys.stderr)
+        sys.exit(-1)
+
+    st = SparkTest("PythonWordCount")
+    st.word_count(sys.argv[1])
