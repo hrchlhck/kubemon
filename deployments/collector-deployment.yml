@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sys-monitor-vol
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/root/sys-monitor/data"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sys-monitor-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+  labels:
+    run: collector
+spec:
+  type: ClusterIP
+  clusterIP: 10.103.230.134
+  ports:
+  - port: 9822
+    protocol: TCP
+    targetPort: 9822
+  selector:
+    run: collector
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+spec:
+  selector:
+    matchLabels:
+      run: collector
+  template:
+    metadata:
+      labels:
+        run: collector
+    spec:
+      containers:
+        - name: collector-container
+          image: vpemfh7/sys-monitor:latest
+          args: ["collector", "9822"]
+          ports:
+            - containerPort: 9822
+          volumeMounts:
+            - name: sys-monitor-vol
+              mountPath: /opt/data # path inside container
+      volumes:
+        - name: sys-monitor-vol
+          persistentVolumeClaim:
+            claimName: sys-monitor-claim
+      nodeName: master
