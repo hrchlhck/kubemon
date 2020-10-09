@@ -1,11 +1,15 @@
 #!/bin/bash
 
 # Get kubernetes cluster ip from any node based on 6443 port
-CLUSTER_IP=`netstat -tn 2>/dev/null | grep 6443 | head -n 1 | cut -d: -f2 | awk '{print $2}'`
+CLUSTER_IP=`kubectl get svc/collector -o jsonpath={'.spec.clusterIP'}`
 MONITOR_PORT=9822
 WORKER_COUNT=`expr $(kubectl get nodes -l node-role.kubernetes.io/worker=worker | wc -l) - 1`
 
-cat > deployment.yml <<EOF
+if [ ! -d "deployments" ]; then
+    mkdir deployments
+fi
+
+cat > deployments/deployment.yml <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
