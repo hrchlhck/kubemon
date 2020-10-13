@@ -42,4 +42,4 @@ WORKDIR ./tests/
 
 ENV PYSPARK_PYTHON=/usr/local/bin/python3.8
 
-ENTRYPOINT ["python3.8", "cpu/cpu_test.py"]
+CMD ["python3.8", "cpu/cpu_test.py", "data/bible.txt"]

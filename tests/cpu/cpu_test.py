@@ -1,6 +1,7 @@
 from operator import add
 from functools import wraps
 from pyspark import SparkContext, SparkConf
+from random import random
 from time import perf_counter
 import sys
 
@@ -17,7 +18,10 @@ def timeit(func):
 
 class SparkTest(object):
     def __init__(self, app_name):
-        self.__conf = SparkConf().setMaster("local").setAppName(app_name)
+        self.__conf = SparkConf()\
+            .setMaster("local")\
+            .setAppName(app_name)\
+            .set("spark.executor.cores", "4")
         self.__spark = SparkContext(conf=self.__conf)
     
     @timeit
@@ -29,6 +33,18 @@ class SparkTest(object):
         sort = [(word, count) for word, count in output]
         sort = sorted(sort, key=lambda x: x[:][1])
         print(f"Most used word: {sort[-1]}")
+        
+    @timeit
+    def pi(self, partitions):
+        n = 100000 * partitions
+
+        def f(_):
+            x = random() * 2 - 1
+            y = random() * 2 - 1
+            return 1 if x ** 2 + y ** 2 <= 1 else 0
+
+        count = self.__spark.parallelize(range(1, n + 1), partitions).map(f).reduce(add)
+        print("Pi is roughly %f" % (4.0 * count / n))
     
 
 if __name__ == "__main__":
@@ -38,3 +54,4 @@ if __name__ == "__main__":
 
     st = SparkTest("PythonWordCount")
     st.word_count(sys.argv[1])
+    st.pi(2)
