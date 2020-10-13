@@ -1,5 +1,5 @@
 from requests import exceptions
-from sys_monitor.cli.commands import start_collector, start_monitor
+from sys_monitor.cli.commands import start_collector, start_monitor, start_spark_monitor
 import sys
 
 if __name__ == "__main__":
@@ -16,6 +16,8 @@ if __name__ == "__main__":
             elif args[1] == "monitor":
                 start_monitor(args[2], args[3])
                 print("Connection refused")
+            elif args[1] == "spark_monitor":
+                start_spark_monitor(args[2])
             else:
                 print("Option doesn't exist")
         except KeyboardInterrupt:
