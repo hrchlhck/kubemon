@@ -62,8 +62,8 @@ function install_k8s {
     nano /etc/fstab
     
     echo -e "${installer} Installing Kubernetes"
-cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf 
-net.bridge.bridge-nf-call-ip6tables = 1 
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
 EOF
     sysctl --system
@@ -82,14 +82,16 @@ EOF
 
 function uninstall_docker() {
     echo -e "${installer} Uninstalling docker"
-    sudo apt-get purge docker docker-engine docker.io containerd runc -y
-    sudo apt-get autoremove -y
+    sudo apt-get purge docker-ce docker-ce-cli docker.io containerd.io runc -y
+    sudo apt-get autoremove -y --allow-change-held-packages
+    sudo apt-get update
     rm -rf /opt/cni /opt/containerd
+    rm -rf /var/lib/docker
 }
 
 function uninstall_k8s() {
     echo -e "${installer} Uninstalling Kubernetes"
-    sudo apt-get purge kube* -y
+    sudo apt-get purge kube* -y --allow-change-held-packages
     sudo apt-get autoremove -y
 }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CLUSTER_IP=`netstat -tn 2>/dev/null | grep 6443 | head -n 1 | cut -d: -f2 | awk '{print $2}'`
+CLUSTER_IP=`ip route get 1 | awk {'print $7;exit'}`
 kbcfg="$HOME/.kube/config"
 
 kubeadm reset
