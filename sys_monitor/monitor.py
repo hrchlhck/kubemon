@@ -16,6 +16,7 @@ class Monitor:
         self.__cpu = CPU()
         self.__disk = Disk()
         self.__network = Network()
+        self.__header = {"from": "sys_monitor"}
 
     def __get_data(self):
         disk = self.__disk.get_info()
@@ -75,9 +76,7 @@ class Monitor:
 
         return (cpu_usage, memory_usage, disk_read_avg, disk_write_avg, bytes_recv, bytes_sent, packets_recv, packets_sent)
 
-    def start(self):
-        header = {"from": "sys_monitor"}
-        
+    def start(self):      
         if not self.__verbose:
             print("Running on silent mode\n")
 
@@ -106,6 +105,6 @@ class Monitor:
                 print(f"Net pkt recv: {temp[7]}")
 
             try:
-                requests.post(self.__address, json=json.dumps(data), headers=header)
+                requests.post(self.__address, json=json.dumps(data), headers=self.__header)
             except ConnectionError:
                 print('Connection refused.')
