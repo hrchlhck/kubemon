@@ -1,6 +1,6 @@
 from requests import post
 from time import sleep
-from utils import filter_dict, load_json, join, merge_dict, subtract_dicts
+from .utils import filter_dict, load_json, join, merge_dict, subtract_dicts
 import json
 
 
