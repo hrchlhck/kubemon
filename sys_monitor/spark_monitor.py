@@ -1,6 +1,6 @@
+from .utils import filter_dict, load_json, join, merge_dict, subtract_dicts
 from requests import post
 from time import sleep
-from utils import filter_dict, load_json, join, merge_dict, subtract_dicts
 import json
 
 
@@ -63,8 +63,3 @@ class SparkMonitor:
                         data), headers=self.__header)
             except:
                 print("Connection refused. Retrying...")
-
-
-if __name__ == '__main__':
-    sm = SparkMonitor("0.0.0.0", 9822)
-    sm.start()
