@@ -16,7 +16,7 @@ class SparkMonitor:
         """ Get Spark app ID Path -> <ip>:<port>/api/v1/applications/ """
         tmp = load_json(self.__url)
         if len(tmp) != 0:
-            return tmp[0]["appId"]
+            return tmp[0]["id"]
 
     def __get_stage_info(self):
         """ Get stage info of app Path -> <ip>:<port>/api/v1/applications/<app_id>/stages/ """

@@ -14,8 +14,7 @@ if __name__ == "__main__":
             if args[1] == "collector":
                 start_collector(args[2])
             elif args[1] == "monitor":
-                start_monitor(args[2], args[3])
-                print("Connection refused")
+                start_monitor(args[2])
             elif args[1] == "spark_monitor":
                 start_spark_monitor(args[2])
             else:

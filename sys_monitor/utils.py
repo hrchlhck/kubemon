@@ -3,13 +3,14 @@ from requests import get
 from operator import sub
 import json
 
+
 def subtract_dicts(dict1, dict2):
     """ Subtracts values from dict1 and dict2 """
     if len(dict1) != len(dict2):
         raise KeyError("Mapping key not found")
-    values = list(map(lambda _dict: reduce(sub, _dict),
-                      zip(dict2.values(), dict1.values())))
-    return dict(zip(dict1.keys(), values))
+    values = map(lambda _dict: reduce(sub, _dict),
+                 zip(dict2.values(), dict1.values()))
+    return dict(zip(dict1.keys(), map(lambda n: round(n, 4), values)))
 
 
 def merge_dict(*dicts):
@@ -17,7 +18,7 @@ def merge_dict(*dicts):
     result = {}
     for d in dicts:
         if d != None:
-          result.update(d)
+            result.update(d)
     return result
 
 
