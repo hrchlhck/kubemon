@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+    collector:
+        image: vpemfh7/sys-monitor:latest
+        command: ["collector", "9822"]
+        ports:
+            - "9822:9822"
+        volumes:
+          - ../data:/opt/data

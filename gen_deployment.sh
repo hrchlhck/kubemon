@@ -1,11 +1,10 @@
 #!/bin/bash
 
-# Get kubernetes cluster ip from any node based on 6443 port
-CLUSTER_IP=`kubectl get svc/collector -o jsonpath={'.spec.clusterIP'}`
+CLUSTER_IP=`kubectl get nodes -o wide --selector='node-role.kubernetes.io/master' | grep -Eo "[0-9]{2}\.[0-9]{2}\.[0-9]{1}\.[0-9]{3}"`
 MONITOR_PORT=9822
-WORKER_COUNT=`kubectl get nodes | grep node | wc -l`
+WORKER_COUNT=`expr $(kubectl get nodes --selector='!node-role.kubernetes.io/master' | wc -l) - 1`
 
-cat > deployments/sys-monitor-deployment.yml <<EOF
+cat > deployments/monitor-deployment.yml <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,27 +29,31 @@ spec:
               - containerPort: $MONITOR_PORT
 EOF
 
-cat deployments/spark-monitor-deployment.yml <<EOF
+cat > deployments/spark-cpu-deployment.yml <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: monitor-dpl
+    name: cpu-test
     labels:
-        app: spark-monitor
+        app: spark-cpu-test
 spec:
     replicas: $WORKER_COUNT
     selector:
         matchLabels:
-            app: spark-monitor
+            app: spark-cpu-test
     template:
         metadata:
             labels:
-                app: spark-monitor
+                app: spark-cpu-test
         spec:
             containers:
+            - name: spark-cpu-test
+              image: vpemfh7/spark-cpu-test:latest
+              ports:
+                - containerPort: 4040
             - name: spark-monitor
-              image: vpemfh7/spark-monitor:latest
-              args: ["spark-monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
+              image: vpemfh7/sys-monitor:latest
+              args: ["spark_monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
               ports:
               - containerPort: $MONITOR_PORT
 EOF
