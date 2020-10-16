@@ -31,15 +31,13 @@ RUN make altinstall
 
 WORKDIR /opt/
 
-COPY cpu/ tests/cpu
-COPY bible.txt tests/data/bible.txt
+COPY cpu_test.py .
+COPY bible.txt .
 COPY requirements.txt .
 
 RUN python3.8 -m pip install --upgrade pip
 RUN python3.8 -m pip install -r requirements.txt
 
-WORKDIR ./tests/
-
 ENV PYSPARK_PYTHON=/usr/local/bin/python3.8
 
-CMD ["python3.8", "cpu/cpu_test.py", "data/bible.txt"]
+CMD ["python3.8", "cpu_test.py", "bible.txt"]
