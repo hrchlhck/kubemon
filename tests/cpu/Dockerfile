@@ -2,6 +2,8 @@ FROM openjdk:8
 
 WORKDIR /opt/
 
+STOPSIGNAL SIGINT
+
 RUN wget http://mirror.nbtelecom.com.br/apache/spark/spark-3.0.1/spark-3.0.1-bin-hadoop3.2.tgz
 RUN tar xvf spark-3.0.1-bin-hadoop3.2.tgz
 RUN mv spark-3.0.1-bin-hadoop3.2 /usr/local/spark

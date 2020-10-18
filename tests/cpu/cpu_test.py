@@ -19,7 +19,7 @@ def timeit(func):
 class SparkTest(object):
     def __init__(self, app_name):
         self.__conf = SparkConf()\
-            .setMaster("local")\
+            .setMaster("local[2]")\
             .setAppName(app_name)\
             .set("spark.executor.cores", "2")
         self.__spark = SparkContext(conf=self.__conf)
