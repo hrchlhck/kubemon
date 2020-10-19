@@ -1,6 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from os.path import join, isfile, isdir
-from os import getcwd, makedirs
+from os import getcwd, makedirs, listdir
 import json
 import csv
 
@@ -14,7 +14,7 @@ def create_dir(_dir):
 def save_csv(_dict, name):
     """ Saves a dict into a csv """
 
-    filename = str(name).replace(".", "_") + ".csv"
+    filename = f"{name}{len(listdir('data'))}".replace(".", "_") + ".csv"
     _dir = join(create_dir("data"), filename)
 
     mode = "a"
@@ -44,7 +44,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         post_data = self.rfile.read(content_length).decode("utf-8")
         json_to_dict = json.loads(json.loads(post_data))
         print(json_to_dict)
-        save_csv(json_to_dict, _from + "_" + self.client_address[0])
+        save_csv(json_to_dict, _from)
 
         self.__set_response()
         self.wfile.write("POST request for {}\n".format(self.path).encode("utf-8"))
