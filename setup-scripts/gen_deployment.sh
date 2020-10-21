@@ -2,7 +2,7 @@
 
 CLUSTER_IP=`kubectl get nodes -o wide --selector='node-role.kubernetes.io/master' | grep -Eo "[0-9]{2}\.[0-9]{2}\.[0-9]{1}\.[0-9]{3}"`
 MONITOR_PORT=9822
-WORKER_COUNT=`expr $(kubectl get nodes --selector='!node-role.kubernetes.io/master' | wc -l) - 1`
+WORKER_COUNT=`expr $(kubectl get nodes | wc -l) - 1`
 
 cat > deployments/monitor-deployment.yml <<EOF
 apiVersion: apps/v1
