@@ -42,7 +42,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         post_data = self.rfile.read(content_length).decode("utf-8")
         json_to_dict = json.loads(json.loads(post_data))
         print(json_to_dict)
-        save_csv(json_to_dict, _from)
+        save_csv(json_to_dict, _from + f"_{self.client_address[0].replace('.', '_')}")
 
         self.__set_response()
         self.wfile.write("POST request for {}\n".format(self.path).encode("utf-8"))
