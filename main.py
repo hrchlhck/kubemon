@@ -5,7 +5,7 @@ import sys
 if __name__ == "__main__":
     """
     args[2] -> ip
-    args[3] -> port
+    args[3] -> port / dir
     """
     args = sys.argv
 
