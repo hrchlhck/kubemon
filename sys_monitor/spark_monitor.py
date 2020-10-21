@@ -15,8 +15,7 @@ class SparkMonitor:
     def __get_app_id(self):
         """ Get Spark app ID Path -> <ip>:<port>/api/v1/applications/ """
         tmp = load_json(self.__url)
-        if len(tmp) != 0:
-            return tmp[0]["id"]
+        return tmp[0]["id"]
 
     def __get_stage_info(self):
         """ Get stage info of app Path -> <ip>:<port>/api/v1/applications/<app_id>/stages/ """
@@ -33,7 +32,7 @@ class SparkMonitor:
             "totalInputBytes", "memoryUsed", "totalGCTime", "rddBlocks"
         ]
 
-        if self.__get_stage_info() and self.__get_executors_info():
+        if self.__get_stage_info() or self.__get_executors_info():
             changed_stages = filter_dict(self.__get_stage_info()[0], filters)
             changed_executors = filter_dict(self.__get_executors_info()[0],
                                             filters)

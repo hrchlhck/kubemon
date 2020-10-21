@@ -1,21 +1,19 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from os.path import join, isfile, isdir
-from os import getcwd, makedirs, listdir
+from os.path import join, isfile
+from pathlib import Path
 import json
 import csv
+import sys
 
-
-def create_dir(_dir):
-    if not isdir(_dir):
-        makedirs(_dir)
-    return _dir
-
-
-def save_csv(_dict, name):
+def save_csv(_dict, name, dir_name=sys.argv[-1]):
     """ Saves a dict into a csv """
-
-    filename = f"{name}{len(listdir('data'))}".replace(".", "_") + ".csv"
-    _dir = join(create_dir("data"), filename)
+    
+    filename = f"{name}.csv"
+    _dir = join("data", dir_name)
+    
+    Path(_dir).mkdir(parents=True, exist_ok=True)
+    
+    _dir = join(_dir, filename)
 
     mode = "a"
 
