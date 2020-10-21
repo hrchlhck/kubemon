@@ -3,4 +3,3 @@ version: '3'
 services:
     benchmark:
         image: vpemfh7/cpu-stress:latest
-        restart: unless-stopped

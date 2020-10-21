@@ -19,7 +19,7 @@ def timeit(func):
 class SparkTest(object):
     def __init__(self, app_name):
         self.__conf = SparkConf()\
-            .setMaster("local[2]")\
+            .setMaster("local[3]")\
             .setAppName(app_name)\
             .set("spark.executor.cores", "2")
         self.__spark = SparkContext(conf=self.__conf)
@@ -55,10 +55,9 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     c = 0
-    st = SparkTest("PythonWordCount")
+    st = SparkTest("PythonCPU")
     
     while True:
         st.word_count(sys.argv[1]).saveAsSequenceFile(f"data{c}.txt")
         st.pi(1000)
-        sleep(5)
         c += 1
