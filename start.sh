@@ -11,6 +11,10 @@ OS_MONITOR=./deployments/monitor-deployment.yml
 
 rm -rf data/
 
+function reset_dockercompose() {
+    sed -i -E "s/(test[0-9]+)/test00/g" $DOCKER_COMPOSE
+}
+
 # Updates collector docker-compose file
 function update_dc() {
     sed -i "s/$1/$2/g" $DOCKER_COMPOSE
@@ -18,10 +22,10 @@ function update_dc() {
 }
 
 function stop_spark_cluster() {
-    echo -e "${generator} Stopping all deployments"
-    kubectl delete -f $MASTER --force
-    kubectl delete -f $WORKER --force
-    kubectl delete -f $OS_MONITOR --force
+   echo -e "${generator} Stopping all deployments"
+   kubectl delete -f $OS_MONITOR --force
+   kubectl delete all --all --force
+   sleep 30
 }
 
 # Starts spark cluster on kubernetes and submit a spark job
@@ -35,13 +39,15 @@ function start_spark_cluster() {
     
     echo -e "${generator} Waiting for the cluster to be ready"
     sleep 10 # 
+   
+    echo -e "${generator} Starting Spark jobs"
+    POD_MASTER=$(kubectl get pods --field-selector status.phase=Running | grep -Eo "(spark-master\S*)")
+    kubectl exec $POD_MASTER -c spark-master -- /bin/bash ./start.sh 2>/dev/null &
+    
+    sleep 1
     
     echo -e "${generator} Starting OS monitor"
     kubectl apply -f $OS_MONITOR
-    
-    echo -e "${generator} Starting Spark jobs"
-    MASTER=$(kubectl get pods --field-selector status.phase=Running | grep -Eo "(spark-master\S*)")
-    kubectl exec $MASTER -c spark-master -- /bin/bash ./start.sh 2>/dev/null &
 }
 
 function stop() {
@@ -49,7 +55,7 @@ function stop() {
     stop_containers
     stop_spark_cluster
     stop_collector
-    sed -i -E "s/(test[0-9]+)/test0/g" $DOCKER_COMPOSE
+    reset_dockercompose
     echo -e "${generator} Bye :)"
     exit 0
 }
@@ -93,7 +99,7 @@ function copy_files() {
 }
 
 function start_single() { 
-  last="test0"
+  last="test00"
   
   start_collector
   
@@ -107,17 +113,19 @@ function start_single() {
   
   merge $last
   
-  update_dc $last "test1"
-  
+  update_dc $last "test01"
+    
   sleep 1
   
   clear
+  
+  ./test-csv.sh
 }
 
 function start() {
   echo -e "${generator} Starting benchmark"
-  last="test0"
-  for i in $(seq 1 24); do
+  last="test00"
+  for i in {1..24}; do
     actual="test$i"
     
     update_dc $last $actual
@@ -143,6 +151,8 @@ function start() {
     sleep 1
     
     clear
+    
+    ./test-csv.sh
   done
   echo -e "${generator} DONE!"
 }
@@ -157,4 +167,4 @@ trap stop INT
 copy_files
 start_single $1
 start $1
-sed -i -E "s/(test[0-9]+)/test0/g" $DOCKER_COMPOSE
+reset_dockercompose

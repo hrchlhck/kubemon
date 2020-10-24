@@ -5,8 +5,9 @@ kbcfg="$HOME/.kube/config"
 
 kubeadm reset
 rm -rf $HOME/.kube
+rm -rf /etc/cni/net.d
 
-kubeadm init
+kubeadm init --pod-network-cidr=10.244.0.0/24 
 
 mkdir -p $HOME/.kube
 cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
@@ -16,4 +17,6 @@ echo "KUBECONFIG=${kbcfg}" >> $HOME/.bashrc
 
 export KUEBCONFIG=kbcfg
 
-kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=10.32.0.0/24"
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=10.244.0.0/24"
+
+kubectl taint nodes $(hostname) node-role.kubernetes.io/master-
