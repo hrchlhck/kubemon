@@ -5,6 +5,11 @@ plain='\033[0m'
 generator="[${green} SYS-MONITOR ${plain}]"
 DOCKER_COMPOSE=./deployments/docker-compose.yml
 DOCKER_COMPOSE_BENCHMARK=./tests/cpu/benchmark/docker-compose.yml
+MASTER=./deployments/spark-master.yml
+WORKER=./deployments/spark-worker.yml
+OS_MONITOR=./deployments/monitor-deployment.yml
+
+rm -rf data/
 
 # Updates collector docker-compose file
 function update_dc() {
@@ -12,21 +17,41 @@ function update_dc() {
     echo -e "${generator} Updated from $1 to $2"
 }
 
+function stop_spark_cluster() {
+    echo -e "${generator} Stopping all deployments"
+    kubectl delete -f $MASTER --force
+    kubectl delete -f $WORKER --force
+    kubectl delete -f $OS_MONITOR --force
+}
+
+# Starts spark cluster on kubernetes and submit a spark job
+function start_spark_cluster() {    
+    echo -e "${generator} Starting Spark cluster on Kubernetes"
+    kubectl apply -f $MASTER
+    
+    sleep 5
+    
+    kubectl apply -f $WORKER
+    
+    echo -e "${generator} Waiting for the cluster to be ready"
+    sleep 10 # 
+    
+    echo -e "${generator} Starting OS monitor"
+    kubectl apply -f $OS_MONITOR
+    
+    echo -e "${generator} Starting Spark jobs"
+    MASTER=$(kubectl get pods --field-selector status.phase=Running | grep -Eo "(spark-master\S*)")
+    kubectl exec $MASTER -c spark-master -- /bin/bash ./start.sh 2>/dev/null &
+}
+
 function stop() {
     echo -e "${generator} STOPPING PROGRAM"
     stop_containers
-    stop_k8s_deploy
+    stop_spark_cluster
     stop_collector
     sed -i -E "s/(test[0-9]+)/test0/g" $DOCKER_COMPOSE
     echo -e "${generator} Bye :)"
     exit 0
-}
-
-function stop_k8s_deploy() {
-    if [ -n "$(kubectl get all | grep -Eo '(cpu)|(monitor)')" ]; then
-        echo -e "${generator} Removing existing deployments $deployment"
-        kubectl delete all --all --force
-    fi;
 }
 
 function start_containers() {
@@ -43,14 +68,6 @@ function stop_containers() {
   ssh root@10.32.1.138 "docker-compose -f /opt/docker-compose.yml down -t 0"
 }
 
-function start_k8s_deploy() {
-  echo -e "${generator} Starting OS monitor"
-  kubectl apply -f deployments/monitor-deployment.yml
-
-  echo -e "${generator} Starting Spark monitor"
-  kubectl apply -f deployments/spark-cpu-deployment.yml
-}
-
 function stop_collector() {
     echo -e "${generator} Stopping collector"
     docker-compose -f $DOCKER_COMPOSE down -t 0
@@ -62,9 +79,10 @@ function start_collector() {
 }
 
 function merge() {
+  SPARK_MONITOR_CSV=$(ls data/$1 | grep spark_monitor)
   for file in $(ls data/$1 | grep -Eo "_[0-9].*" | sort -u); do
     echo -e "${generator} Merging sys_monitor$file with spark_monitor$file"
-    python3 ./merge.py "./data/$1/sys_monitor$file" "./data/$1/spark_monitor$file"
+    python3 ./merge.py "./data/$1/sys_monitor$file" "./data/$1/$SPARK_MONITOR_CSV"
   done
 }
 
@@ -74,16 +92,16 @@ function copy_files() {
   scp $DOCKER_COMPOSE_BENCHMARK root@10.32.1.138:/opt/
 }
 
-function start_single() {
+function start_single() { 
   last="test0"
   
   start_collector
   
-  start_k8s_deploy
+  start_spark_cluster
   
   sleep $1
 
-  stop_k8s_deploy
+  stop_spark_cluster
 
   stop_collector
   
@@ -105,8 +123,8 @@ function start() {
     update_dc $last $actual
 
     start_collector
-
-    start_k8s_deploy
+    
+    start_spark_cluster
     
     start_containers $i
     
@@ -114,7 +132,7 @@ function start() {
 
     stop_containers 
 
-    stop_k8s_deploy
+    stop_spark_cluster
 
     stop_collector
 
