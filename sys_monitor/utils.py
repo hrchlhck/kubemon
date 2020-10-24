@@ -47,4 +47,7 @@ def join(url, *pages):
 
 def load_json(url):
     """ Parses a JSON to a Python dictionary """
-    return json.loads(get(url).text)
+    try:
+        return json.loads(get(url).text)
+    except:
+        print("Connection refused")

@@ -46,7 +46,9 @@ class Monitor:
 
         return subtract_dicts(data, data_new)
 
-    def start(self):      
+    def start(self):
+        sleep(self.__interval)      
+        
         if not self.__verbose:
             print("Running on silent mode\n")
 
