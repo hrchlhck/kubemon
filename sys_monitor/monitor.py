@@ -43,7 +43,7 @@ class Monitor:
         sleep(self.__interval)
         
         data_new = self.__get_data()
-
+        
         return subtract_dicts(data, data_new)
 
     def start(self):

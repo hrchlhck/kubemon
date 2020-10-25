@@ -125,7 +125,7 @@ function start_single() {
 function start() {
   echo -e "${generator} Starting benchmark"
   last="test00"
-  for i in {1..24}; do
+  for i in {01..24}; do
     actual="test$i"
     
     update_dc $last $actual
