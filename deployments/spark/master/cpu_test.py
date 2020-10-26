@@ -22,14 +22,15 @@ class SparkTest(object):
         self.__spark = SparkContext().getOrCreate()
 
     @timeit
-    def word_count(self, file):
-        lines = self.__spark.read.text(file).rdd.map(lambda r: r[0])
-        counts = lines.flatMap(lambda x: x.split(' ')) \
-                  .map(lambda x: (x, 1)) \
-                  .reduceByKey(add)
-        output = counts.collect()
-        for (word, count) in output:
-            print("%s: %i" % (word, count))
+    def word_count(self):
+        lines = self.__spark.textFile("/bible.txt")
+        while True:
+            counts = lines.flatMap(lambda x: x.split(' ')) \
+                      .map(lambda x: (x, 1)) \
+                      .reduceByKey(add)
+            output = counts.collect()
+            for (word, count) in output:
+                print("%s: %i" % (word, count))
 
     @timeit
     def pi(self):
@@ -46,11 +47,11 @@ class SparkTest(object):
         print("Pi is roughly %f" % (4.0 * count / n))
 
     def start(self):
-        t0 = Thread(target=self.pi, args=())
-        # t1 = Thread(target=self.word_count, args=("/bible.txt"))
+        #t0 = Thread(target=self.pi, args=())
+        t1 = Thread(target=self.word_count)
         
-        t0.start()
-        # t1.start()
+        #t0.start()
+        t1.start()
 
     def this(self):
         return self.__spark

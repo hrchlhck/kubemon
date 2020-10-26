@@ -3,6 +3,7 @@ FROM bde2020/spark-base:3.0.0-hadoop3.2
 LABEL maintainer="Gezim Sejdiu <g.sejdiu@gmail.com>, Giannis Mouchakis <gmouchakis@gmail.com>"
 
 COPY worker.sh /
+COPY bible.txt /
 
 ENV SPARK_WORKER_WEBUI_PORT 8081
 ENV SPARK_WORKER_LOG /spark/logs
