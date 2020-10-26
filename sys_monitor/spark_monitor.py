@@ -1,6 +1,7 @@
 from .utils import filter_dict, load_json, join, merge_dict, subtract_dicts
-from requests import post
+from subprocess import check_output
 from threading import Thread, Lock
+from requests import post
 from time import sleep
 from json import dumps
 
@@ -15,19 +16,27 @@ class SparkMonitor:
         self.__check_interval = check_interval
         self.__mutex = Lock()
         self.__data = []
+        self.__ip = check_output(["hostname", "-i"]).decode("utf-8")
 
     def __get_app_id(self):
-        """ Get Spark app ID Path -> <ip>:<port>/api/v1/applications/ """
+        """ Get Spark app ID 
+        Path -> <ip>:<port>/api/v1/applications/
+        """
         tmp = load_json(self.__url)
         return tmp[0]["id"] if tmp else []
 
     def __get_stage_info(self, _id=""):
-        """ Get stage info of app Path -> <ip>:<port>/api/v1/applications/<app_id>/stages/<stage_id> """
+        """ Get stage info of app 
+            Path -> <ip>:<port>/api/v1/applications/<app_id>/stages/<stage_id>
+        """
         return load_json(join(self.__url, self.__app_id, "stages", _id))
 
-    def __get_executors_info(self):
-        """ Get stage info of app Path -> <ip>:<port>/api/v1/applications/<app_id>/allexecutors """
-        return load_json(join(self.__url, self.__app_id, "allexecutors"))
+    def __get_executor_info(self):
+        """ Get executor info based on worker IP
+            Path -> <ip>:<port>/api/v1/applications/<app_id>/stages/<stage_id>
+        """
+        executors = load_json(join(self.__url, self.__app_id, "executors"))
+        return list(filter(lambda executor: self.__ip in executor["hostPort"], executors))[0]
             
     def __get_info(self, method):
         """ Applies an condition to a method and updates app_id if it is empty """
@@ -36,19 +45,17 @@ class SparkMonitor:
         else:
             return method()
 
-    def __check_api(self):
+    def __get_cpu_usage(self):
+        """ Checks the REST API provided by Spark and gets the CPU usage"""
         while True:
             stage = self.__get_stage_info(self.__get_stage_info()[0]["stageId"])[0]
-            executors = self.__get_executors_info()[0]
             status = stage["status"]
-            print(status)
             sleep(self.__check_interval)
-            
             if status == "ACTIVE":
                cpu = stage["executorCpuTime"]
                with self.__mutex:
                    print(cpu)
-                   self.__cpu_usage.append(cpu)
+                   self.__data.append(cpu)
 
     def __get_data(self):
         """ Retrieves data from Spark REST API as dictionary """
@@ -57,35 +64,29 @@ class SparkMonitor:
             "totalInputBytes", "memoryUsed", "totalGCTime"
         ]
 
-        stage = self.__get_info(self.__get_stage_info)
-        executors = self.__get_info(self.__get_executors_info)
+        cpu_usage = 0
+        executor = filter_dict(self.__get_executor_info(), filters)
+
+        sleep(self.__interval)
         
-        if stage or executors:
-            stage = self.__get_info(self.__get_stage_info)
-            executors = self.__get_info(self.__get_executors_info)
+        executor_new = filter_dict(self.__get_executor_info(), filters)
+        
+        executor = subtract_dicts(executor, executor_new)
+        
+        with self.__mutex:
+            cpu_usage = sum(self.__data) / len(self.__data)
+            self.__data = []
+        
+        return merge_dict({"executorCpuTime": cpu_usage}, executor)
             
-            changed_stages = filter_dict(stage[0], filters)
-            changed_executors = filter_dict(executors[0], filters)
-
-            print(changed_stages, changed_executors)
-
-            sleep(self.__interval)
-
-            stage = self.__get_info(self.__get_stage_info)
-            executors = self.__get_info(self.__get_executors_info)
-
-            changed_stages_new = filter_dict(stage[0], filters)
-            changed_executors_new = filter_dict(executors[0], filters)
-
-            changed_stages = subtract_dicts(changed_stages, changed_stages_new)
-            changed_executors = subtract_dicts(changed_executors, changed_executors_new)
-            return merge_dict(changed_stages, changed_executors)
-        else:
-            sleep(self.__interval)
-
+        
     def start(self):
         """ Starts SparkMonitor and post retrieved data to collector.py """
         sleep(self.__interval)
+        
+        t0 = Thread(target=self.__get_cpu_usage)
+        t0.start()
+        
         while True:
             data = self.__get_data()
             print(data)
