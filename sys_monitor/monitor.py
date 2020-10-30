@@ -47,8 +47,14 @@ class Monitor:
         return subtract_dicts(data, data_new)
 
     def start(self):
-        sleep(self.__interval)      
-        
+        try:
+            loop = True
+            while loop:
+                if requests.get("http://spark-master:4040"):
+                    loop = False
+        except:
+            pass
+
         if not self.__verbose:
             print("Running on silent mode\n")
 
@@ -59,6 +65,6 @@ class Monitor:
                 print(temp)
 
             try:
-                requests.post(self.__address, json=json.dumps(temp), headers=self.__header)
+                requests.post(self.__address, json=json.dumps(temp), headers=self.__header, timeout=0.4)
             except ConnectionError:
                 print('Connection refused.')

@@ -47,4 +47,8 @@ def join(url, *pages):
 
 def load_json(url):
     """ Parses a JSON to a Python dictionary """
-    return json.loads(get(url).text)
+    try:
+        return get(url).json()
+    except Exception as e:
+        print(e)
+
