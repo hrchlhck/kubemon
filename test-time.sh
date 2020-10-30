@@ -10,7 +10,7 @@ WORKER=./deployments/spark-worker.yml
 OS_MONITOR=./deployments/monitor-deployment.yml
 
 function reset_dockercompose() {
-    sed -i -E "s/(test[0-9]+)/test0/g" $DOCKER_COMPOSE
+    sed -i -E "s/(test[0-9]+)/test00/g" $DOCKER_COMPOSE
 }
 
 # Updates collector docker-compose file
@@ -21,7 +21,7 @@ function update_dc() {
 
 function stop_spark_cluster() {
    echo -e "${generator} Stopping all deployments"
-   kubectl delete all --all
+	kubectl delete all --all
 }
 
 # Starts spark cluster on kubernetes and submit a spark job
@@ -29,11 +29,11 @@ function start_spark_cluster() {
     echo -e "${generator} Starting Spark cluster on Kubernetes"
     kubectl apply -f $MASTER
 
-    sleep 3    
+    sleep 5
 
-    POD_MASTER=$(kubectl get pods | grep -Eo "(spark-master\S*)")
+    POD=$(kubectl get pods | grep -Eo "(spark-master\S*)")
 
-    while [[ $(kubectl get pods $POD_MASTER -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True"  ]]; do
+    while [[ $(kubectl get pods $POD -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True"  ]]; do
 	echo wait for master
 	sleep 5	
     done
@@ -48,17 +48,8 @@ function start_spark_cluster() {
 	    sleep 1	
         done
     done
-
-    sleep 10 
-
-    echo -e "${generator} Starting Spark jobs"
-    kubectl exec $POD_MASTER -c spark-master -- /bin/bash ./start.sh &>/dev/null & 
-
+    
     sleep 5
-     
-    echo -e "${generator} Starting OS monitor"
-    kubectl apply -f $OS_MONITOR
-   
 }
 
 function stop() {
@@ -73,30 +64,12 @@ function stop() {
 
 function start_containers() {
   echo -e "${generator} STARTING $1 CONTAINERS"
-  kubectl apply -f $BENCHMARK 
+  kubectl apply -f $BENCHMARK
 }
 
 function stop_containers() {
   echo -e "${generator} STOPPING $1 CONTAINERS"
-  kubectl delete -f $BENCHMARK 
-}
-
-function stop_collector() {
-    echo -e "${generator} Stopping collector"
-    docker-compose -f $DOCKER_COMPOSE down -t 0
-}
-
-function start_collector() {
-  echo -e "${generator} Starting collector"
-  docker-compose -f $DOCKER_COMPOSE up -d
-}
-
-function merge() {
-  # SPARK_MONITOR_CSV=$(ls data/$1 | grep spark_monitor)
-  for file in $(ls data/$1 | grep -Eo "_[0-9].*" | sort -u); do
-    echo -e "${generator} Merging sys_monitor$file with spark_monitor$file"
-    python3 ./merge.py "./data/$1/sys_monitor$file" "./data/$1/spark_monitor$file"
-  done
+  kubectl delete -f $BENCHMARK
 }
 
 function copy_files() {
@@ -105,76 +78,56 @@ function copy_files() {
   scp $DOCKER_COMPOSE_BENCHMARK root@10.32.1.138:/opt/
 }
 
-function start_single() { 
-  last="test0"
-  
-  start_collector
-  
-  start_spark_cluster
-  
-  sleep $1
-
-  stop_spark_cluster
-
-  stop_collector
-  
-  merge $last
-  
-  update_dc $last "test1"
-    
-  sleep 1
-  
-  clear
-  
-  ./test-csv.sh
-}
-
 function start() {
-  echo -e "${generator} Starting benchmark"
-  last="test0"
-  for i in {1..20}; do
-    actual="test$i"
-   
+  echo -e "${generator} Starting test time"
+  last="test00"
+  for i in $(seq 0 20); do
     echo -e "${generator} Generating deployments..."
     sh setup-scripts/gen_deployment.sh $(($i * 3))
+    actual="test$i"
+  
+    start_spark_cluster
+
+    POD_MASTER=$(kubectl get pods | grep -Eo "(spark-master\S*)")
 
     update_dc $last $actual
 
-    start_collector
+    if [[ ! -d "time-data" ]]; then
+       mkdir "time-data"
+    fi
     
     start_containers $i
+    
+    sleep 10s
 
-    start_spark_cluster
-        
-    sleep $1
+    echo -e "${generator} Starting PySpark job"
+
+    START=$SECONDS
+    kubectl exec -it $POD_MASTER -- /bin/bash ./start.sh &>/dev/null
+    DURATION=$SECONDS
+   
+    echo $actual, $((DURATION - START)) >> time-data/test-wordcount.csv
 
     stop_containers 
-
+    
     stop_spark_cluster
-
-    stop_collector
-
-    merge $actual
     
     last=$actual
-    
-    sleep 1
+	
+    sleep 5
     
     clear
     
-    ./test-csv.sh
-  done
+    done
+  
   echo -e "${generator} DONE!"
-  echo $(date)
+
+  reset_dockercompose
 }
 
-reset_dockercompose
-sleep 1
-echo -e "${generator} Interval of $1 seconds..."
+clear
+kubectl delete all --all
 sleep 1
 trap stop INT
-echo -e "${generator} Generating deployments..."
-sh setup-scripts/gen_deployment.sh 0
-start_single $1
-start $1
-reset_dockercompose
+# copy_files
+start

@@ -23,7 +23,6 @@ spec:
             containers:
             - name: sys-monitor
               image: vpemfh7/sys-monitor:latest
-              imagePullPolicy: Always
               resources:
                 limits:
                   cpu: 200m
@@ -32,23 +31,10 @@ spec:
               args: ["monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
               ports:
               - containerPort: $MONITOR_PORT
+
 EOF
 
 cat > deployments/spark-worker.yml <<EOF
-apiVersion: v1
-kind: LimitRange
-metadata:
-  name: cpu-limit-range
-spec:
-  limits:
-  - default:
-      cpu: 2
-      memory: "2Gi"
-    defaultRequest:
-      cpu: 1
-      memory: "1Gi"
-    type: Container
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -70,6 +56,39 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 8081
+      - name: spark-monitor
+        image: vpemfh7/sys-monitor:latest
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: 200m
+          requests:
+            cpu: 100m
+        args: ["spark_monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
+        ports:
+        - containerPort: $MONITOR_PORT
+EOF
+
+cat > deployments/benchmark.yaml <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: benchmark 
+  labels:
+    app: benchmark
+spec:
+  replicas: $1
+  selector:
+    matchLabels:
+      name: benchmark
+  template:
+    metadata:
+      labels:
+        name: benchmark
+    spec:
+      containers:
+      - name: benchmark
+        image: vpemfh7/cpu-stress:latest
 EOF
 
 cat > deployments/spark-master.yml <<EOF
@@ -132,19 +151,6 @@ spec:
         - containerPort: 7077
         - containerPort: 6066
         - containerPort: 4040
-      - name: spark-monitor
-        image: vpemfh7/sys-monitor:latest
-        imagePullPolicy: Always
-        resources:
-          limits:
-            cpu: 2
-            memory: "2Gi"
-          requests:
-            memory: "2Gi"
-            cpu: 1
-        args: ["spark_monitor", "$CLUSTER_IP"]
-        ports:
-        - containerPort: 9822
       nodeName: ubuntu
 
 EOF
