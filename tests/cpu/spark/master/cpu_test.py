@@ -2,8 +2,7 @@ from operator import add
 from functools import wraps
 from pyspark import SparkContext
 from random import random
-from time import perf_counter
-from threading import Thread
+from time import perf_counter, time, sleep
 
 
 def timeit(func):
@@ -23,19 +22,18 @@ class SparkTest(object):
 
     @timeit
     def word_count(self):
-        lines = self.__spark.textFile("/bible.txt")
+        lines = self.__spark.textFile("/bible.txt").repartition(6)
+        
         while True:
             counts = lines.flatMap(lambda x: x.split(' ')) \
                       .map(lambda x: (x, 1)) \
                       .reduceByKey(add)
             output = counts.collect()
-            for (word, count) in output:
-                print("%s: %i" % (word, count))
 
     @timeit
     def pi(self):
-        partitions = 2 ** 16
-        n = 100000 * partitions
+        partitions = 18
+        n = 100000 * 5000
 
         def f(_):
             x = random() * 2 - 1
@@ -44,14 +42,10 @@ class SparkTest(object):
 
         count = self.__spark.parallelize(
             range(1, n + 1), partitions).map(f).reduce(add)
-        print("Pi is roughly %f" % (4.0 * count / n))
 
     def start(self):
-        #t0 = Thread(target=self.pi, args=())
-        t1 = Thread(target=self.word_count)
-        
-        #t0.start()
-        t1.start()
+        # self.pi()
+        self.word_count()
 
     def this(self):
         return self.__spark
