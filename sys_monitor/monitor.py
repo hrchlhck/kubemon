@@ -65,6 +65,6 @@ class Monitor:
                 print(temp)
 
             try:
-                requests.post(self.__address, json=json.dumps(temp), headers=self.__header, timeout=0.4)
+                requests.post(self.__address, json=json.dumps(temp), headers=self.__header, timeout=2)
             except ConnectionError:
                 print('Connection refused.')

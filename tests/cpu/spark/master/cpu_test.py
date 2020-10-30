@@ -33,7 +33,7 @@ class SparkTest(object):
     @timeit
     def pi(self):
         partitions = 18
-        n = 100000 * 5000
+        n = 100000 * 50000
 
         def f(_):
             x = random() * 2 - 1
@@ -44,8 +44,8 @@ class SparkTest(object):
             range(1, n + 1), partitions).map(f).reduce(add)
 
     def start(self):
-        # self.pi()
-        self.word_count()
+        self.pi()
+        # self.word_count()
 
     def this(self):
         return self.__spark

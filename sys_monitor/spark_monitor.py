@@ -108,7 +108,7 @@ class SparkMonitor:
             try:
                 if data:
                     post(self.__addr, json=dumps(
-                        data), headers=self.__header, timeout=0.5)
+                        data), headers=self.__header, timeout=0.8)
             except Exception as e:
                 print(e)
                 print("Connection refused. Retrying...")
