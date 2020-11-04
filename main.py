@@ -12,7 +12,7 @@ if __name__ == "__main__":
     if len(args) > 1:
         try:
             if args[1] == "collector":
-                start_collector(args[2])
+                start_collector()
             elif args[1] == "monitor":
                 start_monitor(args[2])
             elif args[1] == "spark_monitor":

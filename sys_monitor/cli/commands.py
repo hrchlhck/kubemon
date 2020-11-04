@@ -8,8 +8,8 @@ def start_monitor(addr="localhost", port=9822):
     m.start()
 
 
-def start_collector(port=9822):
-    c = Collector("0.0.0.0", int(port))
+def start_collector(addr="0.0.0.0", port=9822):
+    c = Collector(addr, int(port))
     c.start()
 
 
