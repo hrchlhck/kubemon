@@ -1,71 +1,27 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from os.path import join, isfile
-from pathlib import Path
-import json
-import csv
-import sys
+from .utils import save_csv
+from datetime import datetime
+import socketserver
 
-def save_csv(_dict, name, dir_name=sys.argv[-1]):
-    """ Saves a dict into a csv """
-    
-    filename = f"{name}.csv"
-    _dir = join("data", dir_name)
-    
-    Path(_dir).mkdir(parents=True, exist_ok=True)
-    
-    _dir = join(_dir, filename)
-
-    mode = "a"
-
-    if not isfile(_dir):
-        mode = "w"
-
-    with open(_dir, mode=mode, newline="") as f:
-        writer = csv.DictWriter(f, _dict.keys())
-
-        if mode == "w":
-            writer.writeheader()
-
-        writer.writerow(_dict)
-
-
-class HTTPHandler(BaseHTTPRequestHandler):
-    def __set_response(self, val="POST"):
-        _val = "application/json" if val == "POST" else "text/html"
-        self.send_response(200)
-        self.send_header("Content-type", _val)
-        self.end_headers()
-
-    def do_POST(self):
-        content_length = int(self.headers["Content-Length"])
-        _from = self.headers["from"]
-        post_data = self.rfile.read(content_length).decode("utf-8")
-        json_to_dict = json.loads(json.loads(post_data))
-        print(json_to_dict)
-        save_csv(json_to_dict, _from + f"_{self.client_address[0].replace('.', '_')}")
-
-        self.__set_response()
-        self.wfile.write("POST request for {}\n".format(self.path).encode("utf-8"))
-
-        del post_data, json_to_dict
-
-    def do_GET(self):
-        self.__set_response("GET")
-        with open("static/index.html", "rb") as f:
-            self.wfile.write(f.read())
+class TCPServer(socketserver.BaseRequestHandler):
+    def handle(self):
+        data = self.request.recv(1024).strip()
+        print("From: {}".format(self.client_address[0]))
+        data = eval(data.decode("utf-8"))
+        print(data)
+        save_csv(data[1], data[0], self.client_address[0])
+        self.request.send("OK - {}".format(datetime.now()).encode("utf-8"))
 
 
 class Collector:
-    def __init__(self, addr, port):
+    def __init__(self, host, port):
+        self.__host = host
         self.__port = port
-        self.__addr = addr
 
-    def start(self, server_class=HTTPServer, handler_class=HTTPHandler):
-        server_address = (self.__addr, self.__port)
-        httpd = server_class(server_address, handler_class)
-        print("Serving at port:", self.__port)
-
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            httpd.server_close()
+    def start(self):
+        with socketserver.TCPServer((self.__host, self.__port), TCPServer) as server:
+            try:
+                print("Serving started at address {}:{}".format(
+                    self.__host, self.__port))
+                server.serve_forever()
+            except KeyboardInterrupt:
+                print("Shutting down")

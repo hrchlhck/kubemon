@@ -2,10 +2,9 @@ from requests.exceptions import ConnectionError
 from .entities.cpu import CPU
 from .entities.disk import Disk
 from .entities.network import Network
-from .utils import subtract_dicts
+from .utils import subtract_dicts, send_data
+from requests import get
 from time import sleep
-import json
-import requests
 import psutil
 
 
@@ -13,11 +12,11 @@ class Monitor:
     def __init__(self, address, port, interval=5, verbose=False):
         self.__interval = interval
         self.__verbose = verbose
-        self.__address = f"http://{address}:{port}"
+        self.__address = address
+        self.__port = port
         self.__cpu = CPU()
         self.__disk = Disk()
         self.__network = Network()
-        self.__header = {"from": "sys_monitor"}
 
     def __get_data(self):
         disk = self.__disk.get_info()
@@ -50,7 +49,7 @@ class Monitor:
         try:
             loop = True
             while loop:
-                if requests.get("http://spark-master:4040"):
+                if get("http://spark-master:4040"):
                     loop = False
         except:
             pass
@@ -59,12 +58,9 @@ class Monitor:
             print("Running on silent mode\n")
 
         while True:
-            temp = self.__calc_usage()
+            data = self.__calc_usage()
             
             if self.__verbose:
-                print(temp)
+                print(data)
 
-            try:
-                requests.post(self.__address, json=json.dumps(temp), headers=self.__header, timeout=2)
-            except ConnectionError:
-                print('Connection refused.')
+            send_data((self.__address, self.__port), data, "sys_monitor")
