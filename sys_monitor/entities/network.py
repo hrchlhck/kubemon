@@ -5,6 +5,7 @@ from psutil import net_connections as nc
 
 
 class Network(BaseEntity):
+    """ A simple object to return network usage """
     def get_info(self):
         return self.__parse_data()
 

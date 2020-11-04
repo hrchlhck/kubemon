@@ -3,6 +3,7 @@ import re
 
 
 class Disk(BaseEntity):
+    """ Returns sectors written and read on disk of a Linux based system """
     def get_info(self):
         return self.__parse_data("/sys/block/sda/stat")
 
