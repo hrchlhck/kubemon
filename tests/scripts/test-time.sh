@@ -3,11 +3,11 @@
 green='\033[0;32m'
 plain='\033[0m'
 generator="[${green} SYS-MONITOR ${plain}]"
-DOCKER_COMPOSE=./deployments/docker-compose.yml
-BENCHMARK=./deployments/benchmark.yaml
-MASTER=./deployments/spark-master.yml
-WORKER=./deployments/spark-worker.yml
-OS_MONITOR=./deployments/monitor-deployment.yml
+DOCKER_COMPOSE=../../deployments/docker-compose.yml
+BENCHMARK=../../deployments/benchmark.yaml
+MASTER=../../deployments/spark-master.yml
+WORKER=../../deployments/spark-worker.yml
+OS_MONITOR=../../deployments/monitor-deployment.yml
 
 function reset_dockercompose() {
     sed -i -E "s/(test[0-9]+)/test00/g" $DOCKER_COMPOSE
