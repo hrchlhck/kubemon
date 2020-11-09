@@ -1,6 +1,7 @@
 from functools import reduce
 from os.path import join, isfile
 from pathlib import Path
+from typing import List, Tuple
 from requests import get
 from operator import sub
 import socket
@@ -18,7 +19,7 @@ def subtract_dicts(dict1: dict, dict2: dict) -> dict:
     return dict(zip(dict1.keys(), map(lambda n: round(n, 4), values)))
 
 
-def merge_dict(*dicts: [dict]) -> dict:
+def merge_dict(*dicts: List[dict]) -> dict:
     """ Merges multiple dictionaries """
     result = {}
     for d in dicts:
@@ -27,7 +28,7 @@ def merge_dict(*dicts: [dict]) -> dict:
     return result
 
 
-def filter_dict(_dict: dict, *keys: [...]) -> dict:
+def filter_dict(_dict: dict, *keys: List[object]) -> dict:
     """ Apply a simple filter over a given dictionary
         Usage:
             >>> filter_dict({'a': 1, 'b': 2, 'c':3}, 'a', 'c')
@@ -39,7 +40,7 @@ def filter_dict(_dict: dict, *keys: [...]) -> dict:
     return {k: v for k, v in _dict.items() if k in filters}
 
 
-def join(url: str, *pages: [str]) -> str:
+def join(url: str, *pages: List[str]) -> str:
     """ Joins pages in a given URL. 
         Usage:
             >>> join('https://github.com', 'hrchlhck', 'sys-monitor')
@@ -58,7 +59,7 @@ def load_json(url: str) -> dict:
         print(e)
 
 
-def send_data(addr: (str, int), data: dict, source: str) -> None:
+def send_data(addr: Tuple[str, int], data: dict, source: str) -> None:
     """ 
     This function is responsible for sending data via network socket
     to a TCP Server inside of sys_monitor/collector.py.
