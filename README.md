@@ -2,6 +2,7 @@
 A Python tool for monitoring SLA in container orchestration environments 
 
 ## Dependencies
+- [Python 3](https://www.python.org/)
 - [psutil](https://github.com/giampaolo/psutil)
 - [requests](https://github.com/psf/requests)
 - [pyspark](https://github.com/apache/spark/tree/master/python)
