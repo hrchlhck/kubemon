@@ -1,5 +1,4 @@
-from requests import exceptions
-from sys_monitor.cli.commands import start_collector, start_monitor, start_spark_monitor
+from sys_monitor.cli.commands import *
 import sys
 
 if __name__ == "__main__":
@@ -17,6 +16,8 @@ if __name__ == "__main__":
                 start_monitor(args[2])
             elif args[1] == "spark_monitor":
                 start_spark_monitor(args[2])
+            elif args[1] == "merge":
+                merge_files(args[2], args[3])
             else:
                 print("Option doesn't exist")
         except KeyboardInterrupt:
