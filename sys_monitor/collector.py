@@ -8,7 +8,7 @@ class TCPServer(socketserver.BaseRequestHandler):
         print("From: {}".format(self.client_address[0]))
         data = eval(data.decode("utf-8"))
         print(data)
-        save_csv(data[1], data[0], self.client_address[0])
+        save_csv(data[1], data[0] + "_" + self.client_address[0].replace(".", "_"))
         self.request.send("OK - {}".format(datetime.now()).encode("utf-8"))
 
 
