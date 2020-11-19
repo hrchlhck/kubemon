@@ -1,7 +1,7 @@
-from requests.exceptions import ConnectionError
 from .entities.cpu import CPU
 from .entities.disk import Disk
 from .entities.network import Network
+from socket import socket, AF_INET, SOCK_STREAM
 from .utils import subtract_dicts, send_data
 from requests import get
 from time import sleep
@@ -57,10 +57,13 @@ class Monitor:
         if not self.__verbose:
             print("Running on silent mode\n")
 
-        while True:
-            data = self.__calc_usage()
-            
-            if self.__verbose:
-                print(data)
+        with socket(AF_INET, SOCK_STREAM) as _socket:
+            _socket.connect((self.__address, self.__port))
+            print(f"Connected monitor to collector at {self.__address}:{self.__port}")
+            while True:
+                data = self.__calc_usage()
+                
+                if self.__verbose:
+                    print(data)
 
-            send_data((self.__address, self.__port), data, "sys_monitor")
+                send_data(_socket, data, "sys_monitor")

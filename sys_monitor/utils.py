@@ -5,7 +5,6 @@ from typing import List, Tuple
 from requests import get
 from operator import sub
 import socket
-import json
 import csv
 import sys
 
@@ -59,7 +58,7 @@ def load_json(url: str) -> dict:
         print(e)
 
 
-def send_data(addr: Tuple[str, int], data: dict, source: str) -> None:
+def send_data(socket: socket.socket, data: dict, source: str) -> None:
     """ 
     This function is responsible for sending data via network socket
     to a TCP Server inside of sys_monitor/collector.py.
@@ -67,18 +66,17 @@ def send_data(addr: Tuple[str, int], data: dict, source: str) -> None:
     Arguments:
         data -> A dictionary containing your data
         source -> From where you are sending the data
-        addr -> A tuple containing the address and port of the server
+        socket -> TCP socket
 
     Usage:
         >>> send_data(('localhost', 9999), {'cpu_usage': 120, 'memory': 0.5}, 'sys_monitor')
         >>> # Response from server
         >>> OK - 2020-11-04 14:07:31.339432
     """
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _socket:
-        temp = "('{}', {})".format(source, data)
-        _socket.connect(addr)
-        _socket.sendall(temp.encode("utf-8"))
-        print(_socket.recv(1024).decode("utf-8"))
+    size = 1024
+    temp = f"('{source}', {data})"
+    socket.send(temp.encode("utf-8"))
+    print(socket.recv(size).decode("utf-8"))
 
 
 def save_csv(_dict, name, dir_name=sys.argv[-1]):
