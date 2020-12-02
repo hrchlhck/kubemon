@@ -3,6 +3,9 @@
 CLUSTER_IP=`kubectl get nodes -o wide --selector='node-role.kubernetes.io/master' | grep -Eo "[0-9]{2}\.[0-9]{2}\.[0-9]{1}\.[0-9]{3}"`
 MONITOR_PORT=9822
 WORKER_COUNT=`expr $(kubectl get nodes | wc -l) - 1`
+MASTER_NAME=`kubectl get nodes --selector='node-role.kubernetes.io/master' -o jsonpath='{..name}'`
+
+echo $MASTER_NAME
 
 cat > deployments/monitor-deployment.yml <<EOF
 apiVersion: apps/v1
@@ -23,11 +26,6 @@ spec:
             containers:
             - name: sys-monitor
               image: vpemfh7/sys-monitor:latest
-              resources:
-                limits:
-                  cpu: 200m
-                requests:
-                  cpu: 100m
               args: ["monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
               ports:
               - containerPort: $MONITOR_PORT
@@ -53,17 +51,10 @@ spec:
       containers:
       - name: spark-worker
         image: vpemfh7/spark-worker:latest
-        imagePullPolicy: Always
         ports:
         - containerPort: 8081
       - name: spark-monitor
         image: vpemfh7/sys-monitor:latest
-        imagePullPolicy: Always
-        resources:
-          limits:
-            cpu: 200m
-          requests:
-            cpu: 100m
         args: ["spark_monitor", "$CLUSTER_IP", "$MONITOR_PORT"]
         ports:
         - containerPort: $MONITOR_PORT
@@ -151,6 +142,6 @@ spec:
         - containerPort: 7077
         - containerPort: 6066
         - containerPort: 4040
-      nodeName: ubuntu
+      nodeName: $MASTER_NAME
 
 EOF
