@@ -4,11 +4,11 @@ WORKDIR /opt/
 
 STOPSIGNAL SIGINT
 
-COPY requirements.txt .
+ADD setup.py .
+ADD sys_monitor/ sys_monitor/
+ADD main.py .
 
-RUN pip install -r requirements.txt
-
-COPY sys_monitor/ sys_monitor/
-COPY main.py .
+RUN python setup.py install \
+    && chmod +x main.py
 
 ENTRYPOINT ["python3", "main.py"]
