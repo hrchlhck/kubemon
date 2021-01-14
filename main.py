@@ -1,26 +1,15 @@
 from sys_monitor.cli.commands import *
-import sys
 
 if __name__ == "__main__":
-    """
-    args[2] -> ip
-    args[3] -> port / dir
-    """
-    args = sys.argv
-
-    if len(args) > 1:
-        try:
-            if args[1] == "collector":
-                start_collector()
-            elif args[1] == "monitor":
-                start_monitor(args[2])
-            elif args[1] == "spark_monitor":
-                start_spark_monitor(args[2])
-            elif args[1] == "merge":
-                merge_files(args[2], args[3])
+    try:
+        if args.type == 'merge':
+            if not args.files:
+                print("Merge type requires --file/-f")
             else:
-                print("Option doesn't exist")
-        except KeyboardInterrupt:
-            print("Exiting")
-    else:
-        print("No option selected")
+                merge(*args.files)
+        elif args.type == 'collector':
+            get_system('collector', args).start(int(args.monitors))
+        elif args.type == 'monitor':
+            get_system('monitor', args).start()
+    except KeyboardInterrupt:
+        print("Exiting")

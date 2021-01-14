@@ -2,23 +2,27 @@ from ..monitor import Monitor
 from ..collector import Collector
 from ..spark_monitor import SparkMonitor
 from ..merge import merge
+import argparse
 
-__all__ = ["start_monitor", "start_collector", "start_spark_monitor", "merge_files"]
+__all__ = ["args", "get_system", "merge"]
 
-def start_monitor(addr="localhost", port=9822):
-    m = Monitor(addr, int(port), verbose=True)
-    m.start()
+def get_system(sys_type, args):
+    if args.host and args.port:
+        if sys_type == 'collector':
+            return Collector(args.host, int(args.port))
+        elif sys_type == 'monitor':
+            return Monitor(args.host, int(args.port), verbose=True)
+    elif not args.port:
+        print("Missing --port/-p PORT")
+    elif not args.host:
+        print("Missing --host/-H IP")
 
+parser = argparse.ArgumentParser(description='sys-monitor commands')
 
-def start_collector(addr="0.0.0.0", port=9822):
-    c = Collector(addr, int(port))
-    c.start()
+parser.add_argument('-t', '--type', help='Functionality of sys-monitor. E.g. collector, monitor, merge...')
+parser.add_argument('-H', '--host', help='Host that any of sys-monitor functions will be connecting', metavar='IP')
+parser.add_argument('-p', '--port', help='Port of the host')
+parser.add_argument('-f', '--files', nargs=2, help='Files for merge', metavar=('FILE1', 'FILE2'))
+parser.add_argument('-mn', '--monitors',  default=3, help='Number of monitors that `collector` will be collecting data. By default, it`s 3')
 
-
-def start_spark_monitor(addr, port=9822):
-    sm = SparkMonitor(addr, port)
-    sm.start()
-
-
-def merge_files(file1, file2):
-    merge(file1, file2)
+args = parser.parse_args()
