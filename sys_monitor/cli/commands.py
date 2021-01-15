@@ -1,15 +1,12 @@
 from ..monitor import Monitor
 from ..collector import Collector
 from ..spark_monitor import SparkMonitor
-from ..merge import merge
 import argparse
-
-__all__ = ["args", "get_system", "merge"]
 
 def get_system(sys_type, args):
     if args.host and args.port:
         if sys_type == 'collector':
-            return Collector(args.host, int(args.port))
+            return Collector(args.host, int(args.port), int(args.monitors))
         elif sys_type == 'monitor':
             return Monitor(args.host, int(args.port), verbose=True)
     elif not args.port:
