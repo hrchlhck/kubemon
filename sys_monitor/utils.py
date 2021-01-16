@@ -8,7 +8,10 @@ import socket
 import csv
 import sys
 
+### Constants ###
+CONNECTION_DIED_CODE = "#!"
 
+### Functions ###
 def subtract_dicts(dict1: dict, dict2: dict) -> dict:
     """ Subtracts values from dict1 and dict2 """
     if len(dict1) != len(dict2):

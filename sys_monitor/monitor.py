@@ -1,8 +1,8 @@
 from .entities.cpu import CPU
 from .entities.disk import Disk
 from .entities.network import Network
-from socket import socket, AF_INET, SOCK_STREAM
-from .utils import subtract_dicts, send_data
+from socket import socket, AF_INET, SOCK_STREAM, SO_REUSEADDR, SOL_SOCKET
+from .utils import subtract_dicts, send_data, CONNECTION_DIED_CODE
 from requests import get
 from time import sleep
 import psutil
@@ -46,24 +46,27 @@ class Monitor:
         return subtract_dicts(data, data_new)
 
     def start(self):
-        try:
-            loop = True
-            while loop:
-                if get("http://spark-master:4040"):
-                    loop = False
-        except:
-            pass
-
         if not self.__verbose:
             print("Running on silent mode\n")
 
         with socket(AF_INET, SOCK_STREAM) as _socket:
+            _socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
             _socket.connect((self.__address, self.__port))
-            print(f"Connected monitor to collector at {self.__address}:{self.__port}")
-            while True:
-                data = self.__calc_usage()
-                
-                if self.__verbose:
-                    print(data)
+            print(f"Connected monitor to collector")
+            
+            signal = _socket.recv(1024).decode("utf8")
 
-                send_data(_socket, data, "sys_monitor")
+            if signal and signal == "start":
+                print("Starting monitor")
+
+                try:
+                    while True:
+                        data = self.__calc_usage()
+                        
+                        if self.__verbose:
+                            print(data)
+
+                        send_data(_socket, data, "sys_monitor")
+                except:
+                    _socket.send(CONNECTION_DIED_CODE.encode("utf-8"))
+                    _socket.close()
