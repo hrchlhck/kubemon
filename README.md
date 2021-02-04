@@ -1,6 +1,17 @@
 # sys-monitor
 A Python tool for monitoring SLA in container orchestration environments 
 
+## Building and testing
+For testing sys-monitor you must have installed `gnu-make`. Once it is installed, you must run this command:
+```sh
+$ make build_test && make test
+```
+
+For building, you can simply type
+```sh
+$ make 
+```
+
 ## Dependencies
 - [Python 3](https://www.python.org/)
 - [psutil](https://github.com/giampaolo/psutil)

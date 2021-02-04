@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='sys-monitor',
+    name='sys_monitor',
     version='1.0.0',
     descripton='A Python tool for monitoring SLA in container orchestration environments',
     url='https://github.com/hrchlhck/sys-monitor',
