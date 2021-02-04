@@ -2,6 +2,7 @@ from .utils import save_csv, CONNECTION_DIED_CODE
 from datetime import datetime
 import socketserver, socket
 from socket import timeout as TimeoutException
+from socket import gethostbyname
 import threading
 
 
@@ -13,11 +14,12 @@ class Collector(object):
         self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.__socket.bind((self.__host, self.__port))
         self.__instances = instances
+        self.__clients = list()
+        self.__clients_hostnames = list()
         print("Started collector at {}:{}".format(self.__host, self.__port))
 
     def start(self):
         self.__socket.listen()
-        clients = []
         threads = []
         current_instances = 0
 
@@ -25,7 +27,9 @@ class Collector(object):
             client, address = self.__socket.accept()
             print("\t + {}:{} connected".format(*address))
             threads.append(threading.Thread(target=self.__listen_to_client, args=(client, address)))
-            clients.append(client)
+            self.__clients.append(client)
+            self.__clients_hostnames.append(gethostbyname(address))
+            self.__clients_hostnames.append(client)
             current_instances += 1
             print("\t Current monitors connected: {}".format(current_instances))
 
@@ -33,7 +37,7 @@ class Collector(object):
 
         while line != "start" or line != "exit":
             if line == "start":
-                for _client in clients:
+                for _client in self.__clients:
                     _client.sendall("start".encode('utf8'))
                 
                 for thread in threads:
@@ -43,7 +47,10 @@ class Collector(object):
             elif line == "exit":
                 exit(1)
 
-                
+    
+    def get_clients_hostnames(self):
+        return tuple(self.__clients_hostnames)
+
     def __listen_to_client(self, client: socket.socket, address: tuple) -> None:
         size = 1024
         
@@ -59,9 +66,10 @@ class Collector(object):
                     client.sendall("OK - {}".format(datetime.now()).encode('utf-8'))
                 elif CONNECTION_DIED_CODE in data:
                     print("Client {} died".format(client.getpeername()))
+                    self.__clients.remove(client) 
                     break
             except TimeoutException as e:
                 print(e)
-                print("Client {} died".format(client.getpeername()))
-                
+                print("Client {} died".format(client.getpeername()))                
+                self.__clients.remove(client) 
                 
