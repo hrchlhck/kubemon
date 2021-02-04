@@ -1,7 +1,6 @@
 from ..exceptions.platform_exception import NotLinuxException
 from platform import platform
 
-
 class BaseEntity:
     """ 
     Base class to represent a hardware component e.g. CPU, Hard Disk, RAM memory, network interfaces, etc. 
@@ -14,6 +13,9 @@ class BaseEntity:
 
     def __init__(self):
         self.__check_os()
+
+    def get_usage(self):
+        """ Abstract method """
 
     def __check_os(self):
         if not "Linux" in self.__platform:
