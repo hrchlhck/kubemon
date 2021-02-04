@@ -42,7 +42,7 @@ def filter_dict(_dict: dict, *keys: List[object]) -> dict:
     return {k: v for k, v in _dict.items() if k in filters}
 
 
-def join(url: str, *pages: List[str]) -> str:
+def join_url(url: str, *pages: List[str]) -> str:
     """ Joins pages in a given URL. 
         Usage:
             >>> join('https://github.com', 'hrchlhck', 'sys-monitor')

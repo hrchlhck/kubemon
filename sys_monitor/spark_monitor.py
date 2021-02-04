@@ -1,4 +1,4 @@
-from .utils import filter_dict, load_json, join, merge_dict, subtract_dicts
+from .utils import filter_dict, load_json, join_url, merge_dict, subtract_dicts
 from threading import Thread, Lock
 from requests import post
 from socket import gethostname, gethostbyname
@@ -33,13 +33,13 @@ class SparkMonitor:
         """ Get stage info of app 
             Path -> <ip>:<port>/api/v1/applications/<app_id>/stages/<stage_id>
         """
-        return load_json(join(self.__url, self.__app_id, "stages"))
+        return load_json(join_url(self.__url, self.__app_id, "stages"))
 
     def __get_executor_info(self):
         """ Get executor info based on worker IP
             Path -> <ip>:<port>/api/v1/applications/<app_id>/stages/<stage_id>
         """
-        executors = load_json(join(self.__url, self.__app_id, "executors"))
+        executors = load_json(join_url(self.__url, self.__app_id, "executors"))
         return list(filter(lambda executor: self.__ip in executor["hostPort"], executors))
             
     def __get_info(self, method):
