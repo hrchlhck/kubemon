@@ -8,5 +8,5 @@ setup(
     author='Pedro (vpemfh7) Horchulhack',
     author_email='vpemfh7@protonmail.com',
     license='MIT',
-    install_requires=['pandas', 'requests', 'psutil']
+    install_requires=['pandas', 'requests', 'psutil', 'docker', 'addict']
 )
