@@ -14,24 +14,21 @@ class Monitor:
         self.__verbose = verbose
         self.__address = address
         self.__port = port
-        self.__cpu = CPU()
-        self.__disk = Disk()
-        self.__network = Network()
 
     def __get_data(self):
-        disk = self.__disk.get_info()
-        cpu = self.__cpu.get_info(self.__interval)
-        net = self.__network.get_info()
+        disk = Disk().get_usage()
+        cpu = CPU().get_usage
+        net = Network().get_usage
         mem = psutil.virtual_memory().percent
+        loadavg = psutil.getloadavg()
         data = {
-            "cpu_usage": cpu,
+            **cpu,
             "memory_usage": mem,
-            "dsk_sectors_read": disk["sectors_read"],
-            "dsk_sectors_write": disk["sectors_written"],
-            "bytes_sent": net["bytes_sent"],
-            "bytes_recv": net["bytes_recv"],
-            "packets_sent": net["packets_sent"],
-            "packets_recv": net["packets_recv"],
+            **net,
+            **disk.infos,
+            "loadavg_1min": loadavg[0],
+            "loadavg_5min": loadavg[1],
+            "loadavg_15min": loadavg[2]
         }
         
         return data
@@ -50,11 +47,12 @@ class Monitor:
             print("Running on silent mode\n")
 
         with socket(AF_INET, SOCK_STREAM) as _socket:
+            buffer_size = 1024
             _socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
             _socket.connect((self.__address, self.__port))
             print(f"Connected monitor to collector")
             
-            signal = _socket.recv(1024).decode("utf8")
+            signal = _socket.recv(buffer_size).decode("utf8")
 
             if signal and signal == "start":
                 print("Starting monitor")
@@ -67,6 +65,7 @@ class Monitor:
                             print(data)
 
                         send_data(_socket, data, "sys_monitor")
+                        print(_socket.recv(buffer_size).decode("utf8"))
                 except:
-                    _socket.send(CONNECTION_DIED_CODE.encode("utf-8"))
+                    send_data(_socket, CONNECTION_DIED_CODE, "sys_monitor")
                     _socket.close()

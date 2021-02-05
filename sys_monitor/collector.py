@@ -4,6 +4,7 @@ import socketserver, socket
 from socket import timeout as TimeoutException
 from socket import gethostbyname
 import threading
+import pickle
 
 
 class Collector(object):
@@ -28,7 +29,7 @@ class Collector(object):
             print("\t + {}:{} connected".format(*address))
             threads.append(threading.Thread(target=self.__listen_to_client, args=(client, address)))
             self.__clients.append(client)
-            self.__clients_hostnames.append(gethostbyname(address))
+            self.__clients_hostnames.append(gethostbyname(address[0]))
             self.__clients_hostnames.append(client)
             current_instances += 1
             print("\t Current monitors connected: {}".format(current_instances))
@@ -57,19 +58,16 @@ class Collector(object):
         print("Creating new thread for client {}:{}".format(*address))
         
         while True:
-            try:
-                data = client.recv(size).decode("utf-8")
-                if data and CONNECTION_DIED_CODE not in data:
-                    data = eval(data)
-                    save_csv(data[1], data[0] + "_" + address[0].replace(".", "_"))
-                    print("Received {} from {}:{}".format(data[1], *address))
-                    client.sendall("OK - {}".format(datetime.now()).encode('utf-8'))
-                elif CONNECTION_DIED_CODE in data:
-                    print("Client {} died".format(client.getpeername()))
-                    self.__clients.remove(client) 
-                    break
-            except TimeoutException as e:
-                print(e)
-                print("Client {} died".format(client.getpeername()))                
+            data = pickle.loads(client.recv(size), encoding="utf-8")
+
+            if not data:
+                break
+            elif data and 'data' in data.keys() and 'source' in data.keys() and data['data'] != CONNECTION_DIED_CODE:
+                print("Received {} from {}:{}".format(data['data'], *address))
+                client.sendall("OK - {}".format(datetime.now()).encode('utf-8'))
+                # save_csv(data['data'], data['source'] + "_" + address[0].replace(".", "_"))
+            else:
+                print("Client {} died".format(client.getpeername()))
                 self.__clients.remove(client) 
+                break
                 
