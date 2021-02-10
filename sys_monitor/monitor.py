@@ -50,7 +50,7 @@ class Monitor:
             buffer_size = 1024
             _socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
             _socket.connect((self.__address, self.__port))
-            print(f"Connected monitor to collector")
+            print("Connected monitor to collector")
             
             signal = _socket.recv(buffer_size).decode("utf8")
 
@@ -64,8 +64,8 @@ class Monitor:
                         if self.__verbose:
                             print(data)
 
-                        send_data(_socket, data, "sys_monitor")
+                        send_data(_socket, data, "sys_wide_monitor")
                         print(_socket.recv(buffer_size).decode("utf8"))
                 except:
-                    send_data(_socket, CONNECTION_DIED_CODE, "sys_monitor")
+                    send_data(_socket, CONNECTION_DIED_CODE, "sys_wide_monitor")
                     _socket.close()
