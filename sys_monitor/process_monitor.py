@@ -1,5 +1,5 @@
 from subprocess import check_output
-from utils import save_csv, subtract_dicts, send_data, CONNECTION_DIED_CODE, format_name, get_containers
+from .utils import save_csv, subtract_dicts, send_data, CONNECTION_DIED_CODE, format_name, get_containers
 from threading import Thread
 from time import sleep
 from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
@@ -143,13 +143,17 @@ def collect(name, pid, interval, addr, port):
                 _socket.close()
             
 
-if __name__ == '__main__':
-    client = docker.from_env()
-    containers = get_containers(client, sys.platform)
-    container_pids = [(c.name, get_container_pid(c)) for c in containers]
-    interval = 5
+class ProcessMonitor:
+    def __init__(self, address, port, interval=5):
+        self.__address = address
+        self.__port = port
+        self.__interval = interval
 
-    for container_name, pid in container_pids:
-        t = Thread(target=collect, args=(container_name, pid, interval, '192.168.15.14', 9822))
-        t.start()
-            
+    def start(self):
+        client = docker.from_env()
+        containers = get_containers(client, sys.platform)
+        container_pids = [(c.name, get_container_pid(c)) for c in containers]
+        
+        for container_name, pid in container_pids:
+            t = Thread(target=collect, args=(container_name, pid, self.__interval, self.__address, self.__port))
+            t.start()
