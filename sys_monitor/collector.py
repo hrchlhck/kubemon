@@ -47,6 +47,8 @@ class Collector(object):
                 break
             elif line == "exit":
                 exit(1)
+            else:
+                line = input(">>> ")
 
     
     def get_clients_hostnames(self):
@@ -65,7 +67,7 @@ class Collector(object):
             elif data and 'data' in data.keys() and 'source' in data.keys() and data['data'] != CONNECTION_DIED_CODE:
                 print("Received {} from {}:{}".format(data['data'], *address))
                 client.sendall("OK - {}".format(datetime.now()).encode('utf-8'))
-                # save_csv(data['data'], data['source'] + "_" + address[0].replace(".", "_"))
+                save_csv(data['data'], data['source'] + "_" + address[0].replace(".", "_"), dir_name=data['source'].split('_')[0])
             else:
                 print("Client {} died".format(client.getpeername()))
                 self.__clients.remove(client) 
