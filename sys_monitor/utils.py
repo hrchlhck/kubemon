@@ -1,4 +1,5 @@
 from functools import reduce
+from addict import Dict
 from os.path import join, isfile
 from pathlib import Path
 from typing import List, Tuple
@@ -117,3 +118,11 @@ def save_csv(_dict, name, dir_name=None):
             writer.writeheader()
 
         writer.writerow(_dict)
+
+def format_name(name):
+    return "%s" % name.split('-')[0]
+
+def get_containers(client, platform):
+    if 'win' not in platform:
+        return list(filter(lambda c: 'k8s-bigdata' in c.name and 'POD' not in c.name, client.containers.list()))
+    return client.containers.list()
