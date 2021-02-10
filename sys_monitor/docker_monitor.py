@@ -102,6 +102,6 @@ class DockerMonitor:
     def start(self):
         client = docker.from_env()
         for container in get_containers(client, sys.platform):
-            t = threading.Thread(target=collect, args=(container, self.__interval, self.__addr, self.__port))
+            t = threading.Thread(target=collect, args=(container, self.__interval, self.__address, self.__port))
             t.start()
         
