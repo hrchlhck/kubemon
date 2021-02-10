@@ -7,9 +7,14 @@ from operator import sub
 import socket
 import csv
 import sys
+import pickle
 
 ### Constants ###
 CONNECTION_DIED_CODE = "#!"
+if 'win' in sys.platform:
+    ROOT_DIR=Path(__file__).parent.parent
+else:
+    ROOT_DIR="/tmp/data"
 
 ### Functions ###
 def subtract_dicts(dict1: dict, dict2: dict) -> dict:
@@ -76,28 +81,36 @@ def send_data(socket: socket.socket, data: dict, source: str) -> None:
         >>> # Response from server
         >>> OK - 2020-11-04 14:07:31.339432
     """
-    size = 1024
-    temp = f"('{source}', {data})"
-    socket.send(temp.encode("utf-8"))
-    print(socket.recv(size).decode("utf-8"))
+    temp = pickle.dumps({"source": source, "data": data})
+    socket.send(temp)
 
 
-def save_csv(_dict, name, dir_name=sys.argv[-1]):
+def save_csv(_dict, name, dir_name=None):
     """ Saves a dict into a csv """
+    global ROOT_DIR
 
-    filename = f"{name}.csv"
-    _dir = join("data", dir_name)
+    filename = "%s.csv" % name
 
-    Path(_dir).mkdir(parents=True, exist_ok=True)
+    if 'win' in sys.platform:
+        output_dir = join(ROOT_DIR, "data")
+    else:
+        output_dir = ROOT_DIR
 
-    _dir = join(_dir, filename)
+    if dir_name and not isinstance(dir_name, str):
+        raise ValueError("Expected str instead of %s" % type(dir_name))
+    elif dir_name and isinstance(dir_name, str):
+        output_dir = join(output_dir, dir_name)
 
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    output_dir = join(output_dir, filename)
+    
     mode = "a"
 
-    if not isfile(_dir):
+    if not isfile(output_dir):
         mode = "w"
 
-    with open(_dir, mode=mode, newline="") as f:
+    with open(output_dir, mode=mode, newline="") as f:
         writer = csv.DictWriter(f, _dict.keys())
 
         if mode == "w":
