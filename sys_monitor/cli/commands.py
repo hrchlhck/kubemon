@@ -1,7 +1,11 @@
 from ..monitor import Monitor
 from ..collector import Collector
 from ..spark_monitor import SparkMonitor
+from ..process_monitor import ProcessMonitor
+from ..docker_monitor import DockerMonitor
 import argparse
+
+SYSTEMS = ['collector', 'monitor', 'process', 'docker']
 
 def get_system(sys_type, args):
     if args.host and args.port:
@@ -9,6 +13,10 @@ def get_system(sys_type, args):
             return Collector(args.host, int(args.port), int(args.monitors))
         elif sys_type == 'monitor':
             return Monitor(args.host, int(args.port), verbose=True)
+        elif sys_type == 'process':
+            return ProcessMonitor(args.host, int(args.port))
+        elif sys_type == 'docker':
+            return DockerMonitor(args.host, int(args.port))
     elif not args.port:
         print("Missing --port/-p PORT")
     elif not args.host:

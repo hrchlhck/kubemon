@@ -1,7 +1,8 @@
 from subprocess import check_output
-from utils import save_csv, subtract_dicts
+from utils import save_csv, subtract_dicts, send_data, CONNECTION_DIED_CODE, format_name, get_containers
 from threading import Thread
 from time import sleep
+from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
 import psutil
 import docker
 import sys
@@ -14,11 +15,6 @@ def get_container_pid(container):
 def subtract_tuple(tup1, tup2):
     assert len(tup1) == len(tup2)
     return tuple(round(tup1[i] - tup2[i], 4) for i in range(len(tup1)))
-
-def get_containers(platform):
-    if 'win' not in platform:
-        return list(filter(lambda c: 'k8s-bigdata' in c.name and 'POD' not in c.name, client.containers.list()))
-    return client.containers.list()
 
 def get_cpu_times(process):
     ret = dict()
@@ -95,31 +91,65 @@ def get_pchild_usage(parent_name, process, interval):
     mem_new = round(process.memory_percent(memtype='rss') - mem, 4)
     num_fds = process.num_fds() - num_fds
     net_new = subtract_dicts(net, get_net_usage(process.pid))
+    open_files = len(process.open_files()) - open_files
 
     ret = {**io_new, **cpu_new, **net_new, "cpu_percent": cpu_percent, "memory": mem_new, "num_fds": num_fds, "open_files": open_files}
-    print(ret)
-    filename = "%s_%s_%s" % (parent_name, process.pid, process.name())
-    save_csv(ret, filename, "process")
+    return ret
 
-def collect(name, pid, interval):
-    while True:
+def parallel_send(parent_name, process, interval, addr, port):
+    with socket(AF_INET, SOCK_STREAM) as _socket:
+        buffer_size = 1024
+        _socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        _socket.connect((addr, port))
+        print("Connected process %s collector to server" % format_name(parent_name))
+        
+        signal = _socket.recv(buffer_size).decode("utf8")
+
+        if signal and signal == "start":
+            print("Starting monitor")
+
+            while True:
+                ret = get_pchild_usage(parent_name, process, interval)
+                send_data(_socket, ret, "process_collector_%s_%s" % (format_name(parent_name), process.pid))
+                print(ret)
+                print(_socket.recv(1024).decode("utf8"))
+
+def collect(name, pid, interval, addr, port):
+    with socket(AF_INET, SOCK_STREAM) as _socket:
+        buffer_size = 1024
+        _socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        _socket.connect((addr, port))
+        print("Connected process %s collector to server" % name)
+        
         p = psutil.Process(pid=pid)
 
         if len(p.children()) > 1:
             for child in p.children():
-                thread = Thread(target=get_pchild_usage, args=(name, child, interval))
-                thread.start()
-                sleep(interval)
-        else:
-            get_pchild_usage(name, child, interval)
+                Thread(target=parallel_send, args=(name, child, interval, addr, port)).start()
+
+        signal = _socket.recv(buffer_size).decode("utf8")
+
+
+        if signal and signal == "start":
+            print("Starting monitor")
+
+            try:
+                while True:
+                    ret = get_pchild_usage(name, p, interval)
+                    send_data(_socket, ret, "process_collector_%s_%s" % (format_name(name), p.pid))
+                    print(_socket.recv(buffer_size).decode("utf8"))
+            except:
+                send_data(_socket, CONNECTION_DIED_CODE, "process_collector")
+                _socket.close()
             
 
 if __name__ == '__main__':
     client = docker.from_env()
-    containers = get_containers(sys.platform)
+    containers = get_containers(client, sys.platform)
     container_pids = [(c.name, get_container_pid(c)) for c in containers]
     interval = 5
+
     for container_name, pid in container_pids:
-        print(container_name, pid)
-        if 'namenode' in  container_name:
-            collect(container_name, pid, interval)
+        t = Thread(target=collect, args=(container_name, pid, interval, '192.168.15.14', 9822))
+        t.start()
+            

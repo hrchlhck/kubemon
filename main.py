@@ -7,7 +7,7 @@ if __name__ == "__main__":
             print("Merge type requires --file/-f")
         else:
             merge(*args.files)
-    elif args.type == 'collector':
-        get_system('collector', args).start()
-    elif args.type == 'monitor':
-        get_system('monitor', args).start()
+    elif args.type in SYSTEMS:
+        get_system(args.type, args).start()
+    else:
+        print("Argument %s does not exist." % args.type)
