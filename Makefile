@@ -6,6 +6,7 @@ endif
 
 
 build:
+	python cleanup.py
 	docker build -t vpemfh7/sys-monitor:latest .
 
 build_test:
