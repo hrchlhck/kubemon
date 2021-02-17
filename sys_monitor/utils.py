@@ -1,23 +1,21 @@
-from functools import reduce
+from subprocess import check_output
+from functools import reduce, wraps
 from addict import Dict
 from os.path import join, isfile
 from pathlib import Path
 from typing import List, Tuple
+from collections.abc import Callable
 from requests import get
 from operator import sub
+from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from .constants import ROOT_DIR
+import docker
 import socket
 import csv
 import sys
 import pickle
 
-### Constants ###
-CONNECTION_DIED_CODE = "#!"
-if 'win' in sys.platform:
-    ROOT_DIR=Path(__file__).parent.parent
-else:
-    ROOT_DIR="/tmp/data"
 
-### Functions ###
 def subtract_dicts(dict1: dict, dict2: dict) -> dict:
     """ Subtracts values from dict1 and dict2 """
     if len(dict1) != len(dict2):
@@ -29,11 +27,12 @@ def subtract_dicts(dict1: dict, dict2: dict) -> dict:
 
 def merge_dict(*dicts: List[dict]) -> dict:
     """ Merges multiple dictionaries """
-    result = {}
+    assert dicts != None
+    assert all(i for i in dicts if isinstance(i, dict)) == True
+    ret = dict()
     for d in dicts:
-        if d != None:
-            result.update(d)
-    return result
+        ret.update(d)
+    return ret
 
 
 def filter_dict(_dict: dict, *keys: List[object]) -> dict:
@@ -72,22 +71,28 @@ def send_data(socket: socket.socket, data: dict, source: str) -> None:
     This function is responsible for sending data via network socket
     to a TCP Server inside of sys_monitor/collector.py.
 
-    Arguments:
-        data -> A dictionary containing your data
-        source -> From where you are sending the data
-        socket -> TCP socket
-
-    Usage:
-        >>> send_data(('localhost', 9999), {'cpu_usage': 120, 'memory': 0.5}, 'sys_monitor')
-        >>> # Response from server
-        >>> OK - 2020-11-04 14:07:31.339432
+    Args:
+        data (dict): A dictionary containing your data
+        source (str) From where you are sending the data
+        socket (socket.socket) TCP socket
     """
     temp = pickle.dumps({"source": source, "data": data})
     socket.send(temp)
 
 
-def save_csv(_dict, name, dir_name=None):
-    """ Saves a dict into a csv """
+def save_csv(_dict: dict, name: str, dir_name="") -> None:
+    """ 
+    Saves a dict into a csv 
+
+    Args:
+        _dict (dict): The dictionary that will be written or appended in the file
+        name (str): The name of the file
+        dir_name (str): Subdirectory inside ROOT_DIR/data that the file will be saved
+
+    Raises:
+        ValueError 
+            if `dir_name` type isn't string 
+    """
     global ROOT_DIR
 
     filename = "%s.csv" % name
@@ -105,7 +110,7 @@ def save_csv(_dict, name, dir_name=None):
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     output_dir = join(output_dir, filename)
-    
+
     mode = "a"
 
     if not isfile(output_dir):
@@ -119,10 +124,77 @@ def save_csv(_dict, name, dir_name=None):
 
         writer.writerow(_dict)
 
+
 def format_name(name):
     return "%s" % name.split('-')[0]
 
-def get_containers(client, platform):
+
+def get_containers(client: docker.client.DockerClient, platform=sys.platform) -> List[docker.client.ContainerCollection]:
+    """ 
+    Returns a list of containers. 
+        By default and for my research purpose I'm using Kubernetes, so I'm avoiding containers that
+        contains 'POD' (Assigned by Kuberenetes) and 'k8s-bigdata' (Namespace in Kubernetes that I've created) 
+        in their name. Furthermore I assume that this filter is only applied when the platform is Linux-based, 
+        because I've created a Kubernetes cluster only in Linux-based machines, otherwise, if the platform
+        is Windows or MacOS, the function will return all containers that are running.
+
+    Args:
+        client (DockerClient): Object returned by docker.from_env()
+        platform (str): By default, It uses sys.platform to get the current system platform
+    """
     if 'win' not in platform:
         return list(filter(lambda c: 'k8s-bigdata' in c.name and 'POD' not in c.name, client.containers.list()))
     return client.containers.list()
+
+
+def get_container_pid(container):
+    cmd = ['docker', 'inspect', '-f', '{{.State.Pid}}', container.id]
+    return int(check_output(cmd))
+
+
+def receive(socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> str:
+    """ 
+    Wrapper function for receiving data from a socket. It also decodes it to ut8 by default.
+
+    Args:
+        socket (socket): Socket that will be receiving data from;
+        buffer_size (int): Size of the buffer used by socket.recv() method;
+        encoding_type (str): Encoding type for decoding incoming data.
+    """
+    return socket.recv(buffer_size).decode(encoding_type)
+
+
+def send(address: str, port: int, function: Callable, interval: int, _from="", container_name="", pid=0) -> None:
+    """ 
+    Wrapper function for gathering and sending data from docker containers in a gap of N seconds defined by `interval` parameter.
+
+    Args:
+        address (str): Address of the server that this function will be sending the data
+        port (int): The port
+        function (Callable): The function that will be gathering information
+        interval (int): The time in seconds that the function will be "sleeping"
+        _from (str): Name where the data is being sent
+        container_name (str): Name of the container
+        pid (int): If it's not None, it will specify a PID for monitoring and gathering data
+
+    """
+    with socket.socket(AF_INET, SOCK_STREAM) as sock:
+        sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        sock.connect((address, port))
+
+        print("Connected %s collector to server" % format_name(_from))
+
+        signal = receive(sock)
+
+        if signal and signal == "start":
+            print("Starting")
+            
+            while True:
+                if pid:
+                    ret = function(interval, pid)
+                else:
+                    ret = function(interval)
+                send_data(sock, ret, "%s_%s_%s" %
+                          (_from, format_name(container_name), pid))
+                print(ret)
+                print(receive(sock))
