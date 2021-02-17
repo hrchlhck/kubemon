@@ -8,7 +8,7 @@ class Partition:
         For more information about the attributes, please refer to https://www.kernel.org/doc/html/latest/block/stat.html
     """
 
-    def __init__(self, partition_name, rd_io, rd_merge, rd_sectors, rd_ticks, wt_io, wt_merge, wt_sectors, wt_ticks, in_flight, io_ticks, time_in_queue, ds_io, ds_merges, ds_sectors, ds_ticks):
+    def __init__(self, partition_name, rd_io, rd_merge, rd_sectors, rd_ticks, wt_io, wt_merge, wt_sectors, wt_ticks, in_flight, io_ticks, time_in_queue, ds_io, ds_merges, ds_sectors, ds_ticks, flush_io=0, flush_ticks=0):
         self.__partition_name = partition_name
         self.__info = {
             'read_io': rd_io,
@@ -27,6 +27,9 @@ class Partition:
             'discard_sectors': ds_sectors,
             'discard_ticks': ds_ticks,
         }
+
+        if flush_io and flush_ticks:
+            self.__info.update({"flush_io": flush_io, "flush_ticks": flush_ticks})
 
     @property
     def name(self):
