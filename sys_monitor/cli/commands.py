@@ -1,4 +1,4 @@
-from ..monitor import Monitor
+from ..monitor import OSMonitor
 from ..collector import Collector
 from ..spark_monitor import SparkMonitor
 from ..process_monitor import ProcessMonitor
@@ -12,7 +12,7 @@ def get_system(sys_type, args):
         if sys_type == 'collector':
             return Collector(args.host, int(args.port), int(args.monitors))
         elif sys_type == 'monitor':
-            return Monitor(args.host, int(args.port), verbose=True)
+            return OSMonitor(args.host, int(args.port))
         elif sys_type == 'process':
             return ProcessMonitor(args.host, int(args.port))
         elif sys_type == 'docker':
