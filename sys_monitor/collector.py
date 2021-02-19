@@ -1,5 +1,7 @@
 from .constants import CONNECTION_DIED_CODE
-from .utils import save_csv, receive
+from .utils import save_csv, receive, send_to
+from .decorators import wrap_exceptions
+from addict import Dict
 from datetime import datetime
 import socketserver
 import socket
@@ -37,43 +39,26 @@ class Collector(object):
             current_instances += 1
             print("\t Current monitors connected: {}".format(current_instances))
 
-        line = input(">>> ")
+        for _client in self.__clients:
+            send_to(_client, "start")
 
-        while line != "start" or line != "exit":
-            if line == "start":
-                for _client in self.__clients:
-                    _client.sendall("start".encode('utf8'))
+        for thread in threads:
+            if not thread.is_alive():
+                thread.start()
 
-                for thread in threads:
-                    if not thread.is_alive():
-                        thread.start()
-                break
-            elif line == "exit":
-                exit(1)
-            else:
-                line = input(">>> ")
-
-    def get_clients_hostnames(self):
-        return tuple(self.__clients_hostnames)
-
+    @wrap_exceptions(KeyboardInterrupt, EOFError)
     def __listen_to_client(self, client: socket.socket, address: tuple) -> None:
         print("Creating new thread for client {}:{}".format(*address))
-        size = 1024
 
         while True:
-            data = pickle.loads(client.recv(size), encoding="utf8")
+            data = receive(client)
 
-            if not data:
-                break
-            elif data and 'data' in data and 'source' in data and data['data'] != CONNECTION_DIED_CODE:
-                print("Received {} from {}:{}".format(data['data'], *address))
-                client.sendall(
-                    "OK - {}".format(datetime.now()).encode('utf-8'))
-                file_name = "%s_%s_%s" % (
-                    data['source'], address[0].replace(".", "_"), address[1])
-                save_csv(data['data'], file_name,
-                         dir_name=data['source'].split('_')[0])
-            else:
-                print("Client {} died".format(client.getpeername()))
-                self.__clients.remove(client)
-                break
+            if isinstance(data, dict):
+                data = Dict(data)
+
+            print("Received {} from {}:{}".format(data.data, *address))
+            send_to(client, "OK - {}".format(datetime.now()))
+            file_name = "%s_%s_%s" % (
+                data.source, address[0].replace(".", "_"), address[1])
+            save_csv(data.data, file_name,
+                     dir_name=data.source.split('_')[0])
