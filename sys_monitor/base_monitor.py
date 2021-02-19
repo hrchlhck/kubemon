@@ -23,9 +23,9 @@ class BaseMonitor(object):
     def interval(self):
         return self.__interval
     
-    @staticmethod
-    def get_class_name(_class):
-        return _class.__class__.__name__
+    @property
+    def name(self):
+        return self.__class__.__name__
 
     @wrap_exceptions(KeyboardInterrupt, EOFError)
     def send(self, address: str, port: int, function: Callable, interval: int, _from="", container_name="", pid=0) -> None:
@@ -72,7 +72,7 @@ class BaseMonitor(object):
         """ Method to be implemented by child classes """
 
     def start(self):
-        class_name = BaseMonitor.get_class_name(self)
+        class_name = self.name
 
         if "OSMonitor" == class_name:
             self.send(self.address, self.port, self.collect, self.interval, class_name)
