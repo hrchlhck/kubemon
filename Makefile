@@ -5,8 +5,9 @@ else
 endif
 
 
+all: clean build
+
 build:
-	python cleanup.py
 	docker build -t vpemfh7/sys-monitor:latest .
 
 build_test:
@@ -14,3 +15,6 @@ build_test:
 
 test:
 	docker run -it --rm -v $(ROOT_DIR)/tests:/opt/tests/ vpemfh7/sys-monitor:latest-test
+
+clean:
+	python cleanup.py
