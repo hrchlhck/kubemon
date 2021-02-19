@@ -7,8 +7,9 @@ from typing import List, Tuple
 from collections.abc import Callable
 from requests import get
 from operator import sub
-from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from .constants import ROOT_DIR
+from .decorators import wrap_exceptions
+from time import sleep
 import docker
 import socket
 import csv
@@ -152,49 +153,40 @@ def get_container_pid(container):
     return int(check_output(cmd))
 
 
-def receive(socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> str:
+def try_connect(addr: str, port: int, _socket: socket.socket, timeout: int) -> None:
     """ 
-    Wrapper function for receiving data from a socket. It also decodes it to ut8 by default.
+        Function to try connection of a socket to a server
+
+        Args:
+            addr (str): Address of the server
+            port (int): It's port
+            _socket (socket.socket): Socket object you want to connect to the server
+            timeout (int): Connection attempts
+    """
+    for i in range(timeout):
+        print("Attempt %s" % str(i + 1))
+        try:
+            return _socket.connect((addr, port))
+        except Exception as e:
+            print(e)
+        sleep(1)
+    print("Connection timed out after %s retries" % str(timeout))
+    exit(0)
+
+
+def receive(_socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> str:
+    """ 
+    Wrapper function for receiving data from a socket. It also decodes it to utf8 by default.
 
     Args:
-        socket (socket): Socket that will be receiving data from;
+        _socket (socket): Socket that will be receiving data from;
         buffer_size (int): Size of the buffer used by socket.recv() method;
         encoding_type (str): Encoding type for decoding incoming data.
     """
-    return socket.recv(buffer_size).decode(encoding_type)
+    return pickle.loads(_socket.recv(buffer_size), encoding=encoding_type)
 
 
-def send(address: str, port: int, function: Callable, interval: int, _from="", container_name="", pid=0) -> None:
-    """ 
-    Wrapper function for gathering and sending data from docker containers in a gap of N seconds defined by `interval` parameter.
+@wrap_exceptions(KeyboardInterrupt)
+def send_to(_socket: socket.socket, data: object) -> None:
+    _socket.send(pickle.dumps(data))
 
-    Args:
-        address (str): Address of the server that this function will be sending the data
-        port (int): The port
-        function (Callable): The function that will be gathering information
-        interval (int): The time in seconds that the function will be "sleeping"
-        _from (str): Name where the data is being sent
-        container_name (str): Name of the container
-        pid (int): If it's not None, it will specify a PID for monitoring and gathering data
-
-    """
-    with socket.socket(AF_INET, SOCK_STREAM) as sock:
-        sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        sock.connect((address, port))
-
-        print("Connected %s collector to server" % format_name(_from))
-
-        signal = receive(sock)
-
-        if signal and signal == "start":
-            print("Starting")
-            
-            while True:
-                if pid:
-                    ret = function(interval, pid)
-                else:
-                    ret = function(interval)
-                send_data(sock, ret, "%s_%s_%s" %
-                          (_from, format_name(container_name), pid))
-                print(ret)
-                print(receive(sock))
