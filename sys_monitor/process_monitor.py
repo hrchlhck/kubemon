@@ -1,9 +1,8 @@
-from .utils import subtract_dicts, get_containers, get_container_pid, send
+from .utils import subtract_dicts
 from threading import Thread
+from .base_monitor import BaseMonitor
 from time import sleep
-from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
 import psutil
-import docker
 import sys
 import os
 
@@ -38,14 +37,12 @@ def parse_proc_net(pid):
             yield ret
 
 
-class ProcessMonitor:
-    def __init__(self, address, port, interval=5):
-        self.__address = address
-        self.__port = port
-        self.__interval = interval
+class ProcessMonitor(BaseMonitor):
+    def __init__(self, *args, **kwargs):
+        super(ProcessMonitor, self).__init__(*args, **kwargs)
 
     @staticmethod
-    def get_cpu_times(process: psutil.Process) -> dict:
+    def get_cpu_times(process: psutil.Process, child=False) -> dict:
         """ 
         Returns the CPU usage by a process. 
 
@@ -58,7 +55,8 @@ class ProcessMonitor:
         ret['cpu_system'] = cpu_data.system
         ret['cpu_children_user'] = cpu_data.children_user
         ret['cpu_children_system'] = cpu_data.children_system
-        ret['cpu_iowait'] = cpu_data.iowait
+        if not child:
+            ret['cpu_iowait'] = cpu_data.iowait
         return ret
 
     @staticmethod
@@ -141,17 +139,11 @@ class ProcessMonitor:
         process = psutil.Process(pid=pid)
 
         for child in process.children():
-            args = (self.__address, self.__port, self.get_pchild_usage,
-                    self.__interval, "process_monitor", container_name, child.pid)
-            t = Thread(target=send, args=args)
+            args = (self.address, self.port, self.get_pchild_usage,
+                    self.interval, self.name, container_name, child.pid)
+            t = Thread(target=self.send, args=args)
             t.start()
 
     def start(self) -> None:
         """ Method to start ProcessMonitor """
-        client = docker.from_env()
-        containers = get_containers(client, sys.platform)
-        container_pids = [(c.name, get_container_pid(c)) for c in containers]
-
-        for container_name, pid in container_pids:
-            t = Thread(target=self.collect, args=(container_name, pid))
-            t.start()
+        super(ProcessMonitor, self).start()
