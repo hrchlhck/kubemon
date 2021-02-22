@@ -8,5 +8,5 @@ if 'win' in sys.platform:
 else:
     ROOT_DIR = "/tmp/data"
 
-# For connections
-CONNECTION_DIED_CODE = "#!"
+# Starting message
+START_MESSAGE = "OK"

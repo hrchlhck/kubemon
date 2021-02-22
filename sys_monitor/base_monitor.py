@@ -1,6 +1,7 @@
 import docker
 from .utils import get_containers, get_container_pid, format_name, try_connect, receive, send_to
 from .decorators import wrap_exceptions
+from .constants import START_MESSAGE
 from typing import Callable
 from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
 from threading import Thread
@@ -50,7 +51,7 @@ class BaseMonitor(object):
 
             signal = receive(sock)
 
-            if signal == "start":
+            if signal == START_MESSAGE:
                 print("Starting")
 
                 while True:
