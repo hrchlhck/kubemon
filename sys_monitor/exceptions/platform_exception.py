@@ -3,3 +3,6 @@ class NotLinuxException(Exception):
 
 class NetworkInterfaceException(Exception):
     pass
+
+class PidNotExistException(Exception):
+    pass

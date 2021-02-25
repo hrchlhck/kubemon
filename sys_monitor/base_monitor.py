@@ -1,10 +1,13 @@
 import docker
 from .utils import get_containers, get_container_pid, format_name, try_connect, receive, send_to
+from .exceptions import PidNotExistException
 from .decorators import wrap_exceptions
 from .constants import START_MESSAGE
 from typing import Callable
 from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
 from threading import Thread
+import os
+
 
 class BaseMonitor(object):
     def __init__(self, address, port, interval=5):
@@ -15,18 +18,45 @@ class BaseMonitor(object):
     @property
     def address(self):
         return self.__address
-    
+
     @property
     def port(self):
         return self.__port
-    
+
     @property
     def interval(self):
         return self.__interval
-    
+
     @property
     def name(self):
         return self.__class__.__name__
+
+    @staticmethod
+    def get_memory_usage(pid=None):
+        """ 
+        Returns the memory usage based on /proc virtual file system available in the Linux kernel. 
+        Any questions, please refer to https://man7.org/linux/man-pages/man5/proc.5.html
+
+        Args:
+            pid (int): If not None, get system-wide information about memory usage, otherwise
+                       it will return based on a given pid.
+        """
+        if pid and str(pid) not in os.listdir('/proc'):
+            raise PidNotExistException("Pid %s does not exist" % pid)
+        
+        if not pid:
+            def to_dict(nested_lists): return {k: int(v) for k, v in map(
+                lambda atom_list: atom_list.split(), nested_lists)}
+
+            with open("/proc/vmstat", mode="r") as fd:
+                ret = to_dict(fd.readlines())
+        else:
+            with open('/proc/%s/statm' % pid, mode='r') as fd:
+                infos = ['size', 'resident', 'shared',
+                         'text', 'lib', 'data', 'dt']
+                ret = fd.read()
+                ret = {k: int(v) for k, v in zip(infos, ret.split())}
+        return ret
 
     @wrap_exceptions(KeyboardInterrupt, EOFError)
     def send(self, address: str, port: int, function: Callable, interval: int, _from="", container_name="", pid=0) -> None:
@@ -62,9 +92,10 @@ class BaseMonitor(object):
 
                     print(ret)
 
-                    source = "%s_%s_%s" % (_from, format_name(container_name), pid)
+                    source = "%s_%s_%s" % (
+                        _from, format_name(container_name), pid)
                     message = {"source": source, "data": ret}
-                    
+
                     send_to(sock, message)
 
                     print(receive(sock))
@@ -76,11 +107,13 @@ class BaseMonitor(object):
         class_name = self.name
 
         if "OSMonitor" == class_name:
-            self.send(self.address, self.port, self.collect, self.interval, class_name)
+            self.send(self.address, self.port, self.collect,
+                      self.interval, class_name)
         elif "ProcessMonitor" == class_name or "DockerMonitor" == class_name:
             client = docker.from_env()
             containers = get_containers(client)
-            container_pids = [(c.name, get_container_pid(c)) for c in containers]
+            container_pids = [(c.name, get_container_pid(c))
+                              for c in containers]
 
             for container_name, pid in container_pids:
                 t = Thread(target=self.collect, args=(container_name, pid))
