@@ -42,7 +42,7 @@ class ProcessMonitor(BaseMonitor):
         super(ProcessMonitor, self).__init__(*args, **kwargs)
 
     @staticmethod
-    def get_cpu_times(process: psutil.Process, child=False) -> dict:
+    def get_cpu_times(process: psutil.Process) -> dict:
         """ 
         Returns the CPU usage by a process. 
 
@@ -55,8 +55,7 @@ class ProcessMonitor(BaseMonitor):
         ret['cpu_system'] = cpu_data.system
         ret['cpu_children_user'] = cpu_data.children_user
         ret['cpu_children_system'] = cpu_data.children_system
-        if not child:
-            ret['cpu_iowait'] = cpu_data.iowait
+        ret['cpu_iowait'] = cpu_data.iowait
         return ret
 
     @staticmethod
@@ -108,7 +107,7 @@ class ProcessMonitor(BaseMonitor):
         process = psutil.Process(pid=pid)
         cpu = cls.get_cpu_times(process)
         io = cls.get_io_counters(process)
-        mem = process.memory_percent(memtype='rss')
+        mem = BaseMonitor.get_memory_usage(pid=pid)
         num_fds = process.num_fds()
         net = cls.get_net_usage(process.pid)
 
@@ -118,13 +117,13 @@ class ProcessMonitor(BaseMonitor):
 
         io_new = subtract_dicts(io, cls.get_io_counters(process))
         cpu_new = subtract_dicts(cpu, cls.get_cpu_times(process))
-        mem_new = round(process.memory_percent(memtype='rss') - mem, 4)
+        mem_new = subtract_dicts(mem, BaseMonitor.get_memory_usage(pid=pid))
         num_fds = process.num_fds() - num_fds
         net_new = subtract_dicts(net, cls.get_net_usage(process.pid))
         open_files = len(process.open_files()) - open_files
 
         ret = {**io_new, **cpu_new, **net_new, "cpu_percent": cpu_percent,
-               "memory": mem_new, "num_fds": num_fds, "open_files": open_files}
+               **mem_new, "num_fds": num_fds, "open_files": open_files}
         return ret
 
     def collect(self, container_name: str, pid: int) -> None:

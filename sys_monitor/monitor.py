@@ -15,10 +15,10 @@ class OSMonitor(BaseMonitor):
         disk = Disk().get_usage()
         cpu = CPU().get_usage
         net = Network().get_usage
-        mem = psutil.virtual_memory().percent
+        mem = BaseMonitor.get_memory_usage()
         data = {
             **cpu,
-            "memory_usage": mem,
+            **mem,
             **net,
             **disk.infos,
         }
