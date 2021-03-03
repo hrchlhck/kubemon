@@ -10,13 +10,13 @@ SYSTEMS = ['collector', 'monitor', 'process', 'docker']
 def get_system(sys_type, args):
     if args.host and args.port:
         if sys_type == 'collector':
-            return Collector(args.host, int(args.port), int(args.monitors))
+            return Collector(address=args.host, port=int(args.port), instances=int(args.monitors))
         elif sys_type == 'monitor':
-            return OSMonitor(args.host, int(args.port))
+            return OSMonitor(address=args.host, port=int(args.port))
         elif sys_type == 'process':
-            return ProcessMonitor(args.host, int(args.port))
+            return ProcessMonitor(address=args.host, port=int(args.port))
         elif sys_type == 'docker':
-            return DockerMonitor(args.host, int(args.port))
+            return DockerMonitor(address=args.host, port=int(args.port))
     elif not args.host:
         print("Missing --host/-H IP")
 

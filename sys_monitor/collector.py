@@ -20,18 +20,18 @@ def start_thread(func, args):
 
 
 class Collector(object):
-    def __init__(self, host: str, port: int, instances: int):
-        self.__host = host
+    def __init__(self, address: str, port: int, instances: int):
+        self.__address = address
         self.__port = port
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__socket.bind((self.__host, self.__port))
+        self.__socket.bind((self.__address, self.__port))
         self.__instances = instances
         self.__current_instances = 0
         self.__clients = list()
         self.__mutex = threading.Lock()
         print("Started collector at {}:{} waiting for {} monitors".format(
-            self.__host, self.__port, self.__instances))
+            self.__address, self.__port, self.__instances))
 
     def __accept_connections(self):
         clients = []
@@ -48,7 +48,6 @@ class Collector(object):
                 self.__current_instances += 1
             finally:
                 self.__mutex.release()
-                print("Released from __accept_connections")
 
             print("\t Current monitors connected: {}".format(
                 self.__current_instances))
@@ -90,6 +89,5 @@ class Collector(object):
                         self.__current_instances -= 1
                     finally:
                         self.__mutex.release()
-                        print("Released from __listen_to_client")
                 print("Socket %s has died because %s" % (client, e))
                 exit(1)
