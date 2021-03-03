@@ -59,23 +59,20 @@ class BaseMonitor(object):
         return ret
 
     @wrap_exceptions(KeyboardInterrupt, EOFError)
-    def send(self, address: str, port: int, function: Callable, interval: int, _from="", container_name="", pid=0) -> None:
+    def send(self, function: Callable, function_args: list, _from="", container_name="", pid=0) -> None:
         """ 
         Wrapper function for gathering and sending data from docker containers in a gap of N seconds defined by `interval` parameter.
 
         Args:
-            address (str): Address of the server that this function will be sending the data
-            port (int): The port
             function (Callable): The function that will be gathering information
-            interval (int): The time in seconds that the function will be "sleeping"
+            function_args (list): The arguments of the `function` parameter
             _from (str): Name where the data is being sent
             container_name (str): Name of the container
             pid (int): If it's not None, it will specify a PID for monitoring and gathering data
-
         """
         with socket(AF_INET, SOCK_STREAM) as sock:
             sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-            try_connect(address, port, sock, interval)
+            try_connect(self.address, self.port, sock, self.interval)
 
             print("Connected %s collector to server" % format_name(_from))
 
@@ -85,10 +82,7 @@ class BaseMonitor(object):
                 print("Starting")
 
                 while True:
-                    if pid:
-                        ret = function(interval, pid)
-                    else:
-                        ret = function(interval)
+                    ret = function(*function_args)
 
                     print(ret)
 
@@ -107,14 +101,18 @@ class BaseMonitor(object):
         class_name = self.name
 
         if "OSMonitor" == class_name:
-            self.send(self.address, self.port, self.collect,
-                      self.interval, class_name)
-        elif "ProcessMonitor" == class_name or "DockerMonitor" == class_name:
+            self.send(self.collect, _from=class_name)
+        elif "ProcessMonitor" == class_name:
             client = docker.from_env()
             containers = get_containers(client)
             container_pids = [(c.name, get_container_pid(c))
                               for c in containers]
-
             for container_name, pid in container_pids:
                 t = Thread(target=self.collect, args=(container_name, pid))
                 t.start()
+        elif "DockerMonitor" == class_name:
+            pods = self.pods
+            for pod, containers in pods.items():
+                for container in containers:
+                    t = Thread(target=self.collect, args=(pod, container))
+                    t.start()

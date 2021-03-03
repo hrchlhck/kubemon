@@ -10,12 +10,15 @@ from operator import sub
 from .constants import ROOT_DIR
 from .decorators import wrap_exceptions
 from time import sleep
+from collections import namedtuple
 import docker
 import socket
 import csv
 import sys
 import pickle
 
+# Represents a pair for a container
+Pair = namedtuple('Pair', ['container', 'name'])
 
 def subtract_dicts(dict1: dict, dict2: dict) -> dict:
     """ Subtracts values from dict1 and dict2 """
@@ -130,7 +133,7 @@ def format_name(name):
     return "%s" % name.split('-')[0]
 
 
-def get_containers(client: docker.client.DockerClient, platform=sys.platform) -> List[docker.client.ContainerCollection]:
+def get_containers(client: docker.client.DockerClient, platform=sys.platform, namespace='', to_tuple=False) -> List[docker.client.ContainerCollection]:
     """ 
     Returns a list of containers. 
         By default and for my research purpose I'm using Kubernetes, so I'm avoiding containers that
@@ -142,11 +145,15 @@ def get_containers(client: docker.client.DockerClient, platform=sys.platform) ->
     Args:
         client (DockerClient): Object returned by docker.from_env()
         platform (str): By default, It uses sys.platform to get the current system platform
+        namespace (str): Used to filter containers created by Kubernetes. If empty, it returns all containers
+        to_tuple (bool): Return a list of namedtuples that represent a pair of container and container name 
     """
-    if 'win' not in platform:
-        return list(filter(lambda c: 'k8s-bigdata' in c.name and 'POD' not in c.name, client.containers.list()))
-    return client.containers.list()
+    containers = client.containers.list()
+    _filter = lambda x: 'POD' not in x.name and namespace in x.name
 
+    if not to_tuple:
+        return list(filter(_filter, containers))
+    return list(map(lambda container: Pair(container, container.name), filter(_filter, containers)))
 
 def get_container_pid(container):
     cmd = ['docker', 'inspect', '-f', '{{.State.Pid}}', container.id]
@@ -164,7 +171,7 @@ def try_connect(addr: str, port: int, _socket: socket.socket, timeout: int) -> N
             timeout (int): Connection attempts
     """
     for i in range(timeout):
-        print("Attempt %s" % str(i + 1))
+        print("Attempt %d" % int(i + 1))
         try:
             return _socket.connect((addr, port))
         except Exception as e:
