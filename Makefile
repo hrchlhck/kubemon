@@ -7,13 +7,15 @@ endif
 
 all: clean build
 
+test: build_test run_test
+
 build:
 	docker build -t vpemfh7/sys-monitor:latest .
 
 build_test:
 	docker build -f Dockerfile.test -t vpemfh7/sys-monitor:latest-test .
 
-test:
+run_test:
 	docker run -it --rm -v $(ROOT_DIR)/tests:/opt/tests/ vpemfh7/sys-monitor:latest-test
 
 clean:
