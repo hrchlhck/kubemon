@@ -5,7 +5,7 @@ import unittest
 
 class TestDisk(unittest.TestCase):
     def setUp(self):
-        self.disk = Disk()
+        self.disk = Disk('sda', _disk_stat_path="./tests/resources/data/diskstats")
         self.infos = ['read_io',
                  'read_merge',
                  'read_sectors',
@@ -22,8 +22,17 @@ class TestDisk(unittest.TestCase):
                  'discard_sectors',
                  'discard_ticks']
 
+    def test_name(self):
+        self.assertEqual(self.disk.name, 'sda')
+
+    def test_major(self):
+        self.assertEqual(self.disk.major, 8)
+    
+    def test_minor(self):
+        self.assertEqual(self.disk.minor, 0)
+
     def test_partitions(self):
-        self.assertEqual(len(list(self.disk._Disk__get_partitions())), 3)
+        self.assertEqual(len(list(self.disk._Disk__get_partitions())), 2)
 
     def test_partition_name(self):
         print(self.disk.get_usage(partition='sdb'))
@@ -54,9 +63,6 @@ class TestDisk(unittest.TestCase):
             errors += 1
 
         self.assertEqual(errors, 0)
-
-    def test_partition_count(self):
-        self.assertEqual(len(self.disk.partitions), 3)
 
     def test_all_partition_values(self):
         errors = 0

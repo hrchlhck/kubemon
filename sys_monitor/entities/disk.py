@@ -52,13 +52,47 @@ class Partition:
 class Disk(BaseEntity):
     """ Class for retrieving data about disk partitions from a Linux based system """
 
-    def __init__(self):
+    def __init__(self, name, _disk_stat_path="/proc/diskstats", _partition_path="/proc/partitions"):
+        self.__name = name
+        self._disk_stat_path = _disk_stat_path
+        self._partition_path = _partition_path
+        self.__parse_device_driver()
         self.__partitions = tuple(self.__get_partitions())
         super(Disk, self).__init__()
 
     @property
     def partitions(self):
         return self.__partitions
+
+    @property
+    def name(self):
+        return self.__name
+
+    @property
+    def major(self):
+        return self.__major
+    
+    @property
+    def minor(self):
+        return self.__minor
+
+    def __parse_device_driver(self):
+        """ Parse device driver version """
+        with open(self._disk_stat_path, mode='r') as fd:
+            data = fd.readlines()
+        
+        # Split values from each line
+        data = list(map(lambda x: x.split(), data))
+
+        # Select only major, minor and name values
+        data = list(map(lambda x: (int(x[0]), int(x[1]), x[2]), data))
+
+        # Filter by device name
+        data = list(filter(lambda x: x[2] == self.name, data))[0]
+
+        # Set values
+        self.__major = data[0]
+        self.__minor = data[1]
 
     def get_usage(self, all_partitions=False, partition='sda') -> List[Partition]:
         """ Get information from a partition or from all available partitions started with 'sd' """
@@ -84,10 +118,10 @@ class Disk(BaseEntity):
             data = list(map(int, data))
             return Partition(partition_name, *data)
 
-    def __get_partitions(self):
-        """ Yields every disk partition that contains 'sd' """
-        def is_sd(x): return 'sd' in x
-        with open('/proc/partitions', mode='r') as f:
+    def __get_partitions(self, prefix='sd'):
+        """ Yields every disk partition that contains 'sd' or any given prefix """
+        is_sd = lambda x: prefix in x
+        with open(self._partition_path, mode='r') as f:
             for line in f.readlines():
                 res = tuple(filter(is_sd, line.split()))
                 if res:
