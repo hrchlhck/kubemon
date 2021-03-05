@@ -2,6 +2,7 @@ from .utils import subtract_dicts, filter_dict
 from .base_monitor import BaseMonitor
 from .utils import get_container_pid
 from .process_monitor import parse_proc_net, ProcessMonitor
+from .entities.disk import Disk
 from .pod import *
 from threading import Thread
 from time import sleep
@@ -11,19 +12,21 @@ import psutil
 import time
 import os
 import sys
-    
+
+__all__ = ['DockerMonitor']
 
 class DockerMonitor(BaseMonitor):
-    def __init__(self, namespace='k8s-bigdata', *args, **kwargs):
+    def __init__(self, kubernetes=True, namespace='k8s-bigdata', *args, **kwargs):
         super(DockerMonitor, self).__init__(*args, **kwargs)
-        self.__pods = Pod.list_containers_cgroups('systemd', namespace=namespace, client=docker.from_env())
+        if kubernetes:
+            self.__pods = Pod.list_containers_cgroups('systemd', namespace=namespace, client=docker.from_env())
 
     @property
     def pods(self):
         return self.__pods
 
     @staticmethod
-    def get_path(pod: Pod, container: Pair, cgroup_controller: str, stat: str) -> str:
+    def get_path(cgroup_controller: str, stat: str, container: Pair=None, pod: Pod=None, _alt_path="") -> str:
         """ 
         Get full path of the docker container within the pod, on cgroups directory 
         
@@ -32,9 +35,16 @@ class DockerMonitor(BaseMonitor):
             container (Pair): Named tuple object to represent a container
             cgroup_controller (str): cgroup controller. E.g. cpuacct, memory, blkio, etc.
             stat (str): file inside cgroup_controller
+            _alt_path (str): Alternative path to be gathering data
         """
-        return "/sys/fs/cgroup/%s/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod%s.slice/docker-%s.scope/%s.%s" % (cgroup_controller, pod.id, container.id, cgroup_controller, stat)
+        if pod and not _alt_path:
+            return "/sys/fs/cgroup/%s/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod%s.slice/docker-%s.scope/%s.%s" % (cgroup_controller, pod.id, container.id, cgroup_controller, stat)
+        elif container and not pod and not _alt_path: 
+            return "/sys/fs/cgroup/%s/system.slice/docker-%s.scope/%s.%s" % (cgroup_controller, container.id, cgroup_controller, stat)
+        else:
+            return _alt_path
 
+    @staticmethod
     def parse_fields(data: List[List[str]]) -> dict:
         """
             Parse fields on cgroups files or any file that contains the following pattern:
@@ -49,72 +59,93 @@ class DockerMonitor(BaseMonitor):
                 data (list): List of lists representing a pair of data
         """
         to_int = lambda x: int(x) if x.isdigit() else x
-        data = [d.split() for d in data]
-        ret = {k: to_int(v) for k, v in data}
+        data = list(map(lambda x: x.replace('\n', '').split(), data))
+        field_count = list(filter(lambda x: len(x) > 2, data))
+
+        # Checking columns to avoid dict exceptions
+        if len(field_count) >= 1:
+            ret = list(map(lambda x: tuple(map(lambda y: to_int(y), x)), data))
+        else:
+            ret = {k: to_int(v) for k, v in data}
+
         return ret
 
-    def get_memory_usage(self, pod: Pod, container: Pair) -> dict:
+    def get_memory_usage(self, container: Pair=None, pod: Pod=None, _alt_path="") -> dict:
         """ 
         Get the memory usage of a given container within a pod 
 
         Args:
             pod (Pod): Pod container object
             container (Pair): Container pair namedtuple to be monitored
+            _alt_path (str): Alternative path to be gathering data
         """
         fields = ['rss', 'cache', 'mapped_file', 'pgpgin', 'pgpgout', 'pgfault', 'pgmajfault', 'active_anon', 'inactive_anon', 'active_file', 'inactive_file', 'unevictable']
-        path = DockerMonitor.get_path(pod, container, 'memory', 'stat')
+        path = DockerMonitor.get_path(container=container, pod=pod, cgroup_controller='memory', stat='stat', _alt_path=_alt_path)
 
         with open(path, mode='r') as fd:
-            data = fd.readlines()
+            data = DockerMonitor.parse_fields(list(fd))
         
-        ret = DockerMonitor.parse_fields(data)
-        ret = filter_dict(ret, fields)
+        ret = filter_dict(data, fields)
         return ret
 
-    def get_disk_usage(self, pod: Pod, container: Pair) -> dict:
+    def get_disk_usage(self, container: Pair=None, pod: Pod=None, _alt_path="", **kwargs) -> dict:
         """ 
         Get the disk usage of a given container within a pod 
 
         Args:
             pod (Pod): Pod container object
             container (Pair): Container pair namedtuple to be monitored
+            disk_name (str): Name of the disk to collect major and minor device drivers (only for parsing purposes)
+            _alt_path (str): Alternative path to be gathering data
         """
-        return {    }
+        path = DockerMonitor.get_path(container=container, pod=pod, cgroup_controller='blkio', stat='throttle.io_service_bytes', _alt_path=_alt_path)
+        disk = Disk(**kwargs)
+        dev = f"{disk.major}:{disk.minor}"
 
-    def get_cpu_times(self, pod: Pod, container: Pair) -> dict:
+        with open(path, mode='r') as fd:
+            data = DockerMonitor.parse_fields(list(fd))
+
+        # Filter blkio stats by disk maj:min
+        data = filter(lambda x: len(x) == 3, data)
+        data = filter(lambda x: x[0] == dev, data)
+        data = map(lambda x: x[1:], data)
+
+        # Map to dict
+        ret = {k: v for k, v in data}
+
+        return ret
+
+    def get_cpu_times(self, container: Pair=None, pod: Pod=None, _alt_path="") -> dict:
         """ 
         Get the CPU usage of a given container within a pod 
 
         Args:
             pod (Pod): Pod container object
             container (Pair): Container pair namedtuple to be monitored
+            _alt_path (str): Alternative path to be gathering data
         """
-        cgroup_stats = ['stat', 'usage_user', 'usage_sys']
+        path = DockerMonitor.get_path(container=container, pod=pod, cgroup_controller='cpuacct', stat='stat', _alt_path=_alt_path)
         ret = dict()
-        for stat in cgroup_stats:
-            path = DockerMonitor.get_path(pod, container, 'cpuacct', stat)
-        
-            with open(path, mode='r') as fd:
-                data = fd.readlines()
-            
-            if stat == 'stat':
-                ret.update(DockerMonitor.parse_fields(data))
-            else:
-                ret.update({stat: int(data[0])})
-        return ret
 
-    def get_net_usage(self, container: Pair) -> dict:
+        with open(path, mode='r') as fd:
+            data = DockerMonitor.parse_fields(list(fd))
+
+        return data
+
+    def get_net_usage(self, container: Pair, _alt_path="") -> dict:
         """ 
         Get network usage of a given container within a pod 
 
+        To understand why not gather information from cgroups, please refer to https://docs.docker.com/config/containers/runmetrics/#network-metrics
         Args:
             pod (Pod): Pod container object
             container (Pair): Container pair namedtuple to be monitored
+            _alt_path (str): Alternative path to be gathering data
         """
 
         return ProcessMonitor.get_net_usage(get_container_pid(container.container))
 
-    def get_stats(self, pod: Pod, container: Pair) -> dict:
+    def get_stats(self, container: Pair, pod: Pod=None) -> dict:
         """ 
         Get all metrics of a given container within a pod 
 
@@ -122,22 +153,22 @@ class DockerMonitor(BaseMonitor):
             pod (Pod): Pod container object
             container (Pair): Container pair namedtuple to be monitored
         """
-        cpu = self.get_cpu_times(pod, container)
-        memory = self.get_memory_usage(pod, container)
+        cpu = self.get_cpu_times(container, pod)
+        memory = self.get_memory_usage(container, pod)
         network = self.get_net_usage(container)
-        disk = self.get_disk_usage(pod, container)
+        disk = self.get_disk_usage(container, pod, disk_name='sdb')
 
         sleep(self.interval)
 
-        cpu_new = subtract_dicts(cpu, self.get_cpu_times(pod, container))
-        memory_new = subtract_dicts(memory, self.get_memory_usage(pod, container))
+        cpu_new = subtract_dicts(cpu, self.get_cpu_times(container, pod))
+        memory_new = subtract_dicts(memory, self.get_memory_usage(container, pod))
         network_new = subtract_dicts(network, self.get_net_usage(container))
-        disk_new = subtract_dicts(disk, self.get_disk_usage(pod, container))
+        disk_new = subtract_dicts(disk, self.get_disk_usage(container, pod, disk_name='sdb'))
 
         ret = {**cpu_new, **memory_new, **network_new, **disk_new}
         return ret
 
-    def collect(self, pod: Pod, container: Pair) -> None:
+    def collect(self, container: Pair, pod: Pod=None) -> None:
         """ 
         Method to collects all data from all container processes
 
@@ -145,7 +176,7 @@ class DockerMonitor(BaseMonitor):
             pod (Pod): Pod container object
             container (Pair): Container pair namedtuple to be monitored
         """
-        func_args = (pod, container)
+        func_args = (container, pod)
         super(DockerMonitor, self).send(function=self.get_stats, function_args=func_args, _from=self.name, container_name=container.name)
 
     def start(self) -> None:
