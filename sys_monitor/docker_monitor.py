@@ -16,8 +16,9 @@ import sys
 __all__ = ['DockerMonitor']
 
 class DockerMonitor(BaseMonitor):
-    def __init__(self, kubernetes=True, namespace='k8s-bigdata', *args, **kwargs):
+    def __init__(self, kubernetes=True, namespace='k8s-bigdata', stats_path="/sys/fs/cgroup", *args, **kwargs):
         super(DockerMonitor, self).__init__(*args, **kwargs)
+        self.__stats_path = stats_path
         if kubernetes:
             self.__pods = Pod.list_containers_cgroups('systemd', namespace=namespace, client=docker.from_env())
 
@@ -25,8 +26,11 @@ class DockerMonitor(BaseMonitor):
     def pods(self):
         return self.__pods
 
-    @staticmethod
-    def get_path(cgroup_controller: str, stat: str, container: Pair=None, pod: Pod=None, _alt_path="") -> str:
+    @property
+    def stats_path(self):
+        return self.__stats_path
+
+    def get_path(self, cgroup_controller: str, stat: str, container: Pair=None, pod: Pod=None) -> str:
         """ 
         Get full path of the docker container within the pod, on cgroups directory 
         
@@ -37,12 +41,14 @@ class DockerMonitor(BaseMonitor):
             stat (str): file inside cgroup_controller
             _alt_path (str): Alternative path to be gathering data
         """
-        if pod and not _alt_path:
-            return "/sys/fs/cgroup/%s/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod%s.slice/docker-%s.scope/%s.%s" % (cgroup_controller, pod.id, container.id, cgroup_controller, stat)
-        elif container and not pod and not _alt_path: 
-            return "/sys/fs/cgroup/%s/system.slice/docker-%s.scope/%s.%s" % (cgroup_controller, container.id, cgroup_controller, stat)
+        if pod and not container:
+            ret = f"{self.stats_path}/{cgroup_controller}/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod{pod.id}.slice/docker-{container.id}.scope/{cgroup_controller}.{stat}"
+        elif container and not pod: 
+            ret = f"{self.stats_path}/{cgroup_controller}/system.slice/docker-{container.id}.scope/{cgroup_controller}.{stat}"
         else:
-            return _alt_path
+            ret = f"{self.stats_path}/{cgroup_controller}.{stat}"
+        
+        return ret
 
     @staticmethod
     def parse_fields(data: List[List[str]]) -> dict:
@@ -70,7 +76,7 @@ class DockerMonitor(BaseMonitor):
 
         return ret
 
-    def get_memory_usage(self, container: Pair=None, pod: Pod=None, _alt_path="") -> dict:
+    def get_memory_usage(self, container: Pair=None, pod: Pod=None) -> dict:
         """ 
         Get the memory usage of a given container within a pod 
 
@@ -80,7 +86,7 @@ class DockerMonitor(BaseMonitor):
             _alt_path (str): Alternative path to be gathering data
         """
         fields = ['rss', 'cache', 'mapped_file', 'pgpgin', 'pgpgout', 'pgfault', 'pgmajfault', 'active_anon', 'inactive_anon', 'active_file', 'inactive_file', 'unevictable']
-        path = DockerMonitor.get_path(container=container, pod=pod, cgroup_controller='memory', stat='stat', _alt_path=_alt_path)
+        path = self.get_path(container=container, pod=pod, cgroup_controller='memory', stat='stat')
 
         with open(path, mode='r') as fd:
             data = DockerMonitor.parse_fields(list(fd))
@@ -88,7 +94,7 @@ class DockerMonitor(BaseMonitor):
         ret = filter_dict(data, fields)
         return ret
 
-    def get_disk_usage(self, container: Pair=None, pod: Pod=None, _alt_path="", **kwargs) -> dict:
+    def get_disk_usage(self, container: Pair=None, pod: Pod=None, **kwargs) -> dict:
         """ 
         Get the disk usage of a given container within a pod 
 
@@ -98,7 +104,7 @@ class DockerMonitor(BaseMonitor):
             disk_name (str): Name of the disk to collect major and minor device drivers (only for parsing purposes)
             _alt_path (str): Alternative path to be gathering data
         """
-        path = DockerMonitor.get_path(container=container, pod=pod, cgroup_controller='blkio', stat='throttle.io_service_bytes', _alt_path=_alt_path)
+        path = self.get_path(container=container, pod=pod, cgroup_controller='blkio', stat='throttle.io_service_bytes')
         disk = Disk(**kwargs)
         dev = f"{disk.major}:{disk.minor}"
 
@@ -115,7 +121,7 @@ class DockerMonitor(BaseMonitor):
 
         return ret
 
-    def get_cpu_times(self, container: Pair=None, pod: Pod=None, _alt_path="") -> dict:
+    def get_cpu_times(self, container: Pair=None, pod: Pod=None) -> dict:
         """ 
         Get the CPU usage of a given container within a pod 
 
@@ -124,7 +130,7 @@ class DockerMonitor(BaseMonitor):
             container (Pair): Container pair namedtuple to be monitored
             _alt_path (str): Alternative path to be gathering data
         """
-        path = DockerMonitor.get_path(container=container, pod=pod, cgroup_controller='cpuacct', stat='stat', _alt_path=_alt_path)
+        path = self.get_path(container=container, pod=pod, cgroup_controller='cpuacct', stat='stat')
         ret = dict()
 
         with open(path, mode='r') as fd:
@@ -132,7 +138,7 @@ class DockerMonitor(BaseMonitor):
 
         return data
 
-    def get_net_usage(self, container: Pair, _alt_path="") -> dict:
+    def get_net_usage(self, container: Pair) -> dict:
         """ 
         Get network usage of a given container within a pod 
 

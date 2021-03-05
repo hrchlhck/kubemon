@@ -4,7 +4,7 @@ from sys_monitor import DockerMonitor
 
 class TestDockerMonitor(unittest.TestCase):
     def setUp(self):
-        self.dm = DockerMonitor(address="", port=9999, kubernetes=False)
+        self.dm = DockerMonitor(address="", port=9999, kubernetes=False, stats_path="./tests/entities/data")
 
     def test_parse_key_value_fields(self):
         with open('./tests/entities/data/memory.stat', mode='r') as fd:
@@ -62,10 +62,8 @@ class TestDockerMonitor(unittest.TestCase):
         self.assertEqual(_in, out)
 
     def test_disk_return(self):
-        ap = './tests/entities/data/blkio.throttle.io_service_bytes'
         dsp = "./tests/resources/data/diskstats"
-        data = self.dm.get_disk_usage(
-            _alt_path=ap, disk_name='sdb', _disk_stat_path=dsp)
+        data = self.dm.get_disk_usage(disk_name='sdb', _disk_stat_path=dsp)
         expected = {
             'Read': 0,
             'Write': 1769472,
@@ -77,71 +75,57 @@ class TestDockerMonitor(unittest.TestCase):
         self.assertEqual(data, expected)
 
     def test_cpuacct_stat_user(self):
-        data = self.dm.get_cpu_times(
-            _alt_path="./tests/entities/data/cpuacct.stat")
+        data = self.dm.get_cpu_times()
         self.assertEqual(data['user'], 362)
 
     def test_cpuacct_stat_system(self):
-        data = self.dm.get_cpu_times(
-            _alt_path="./tests/entities/data/cpuacct.stat")
+        data = self.dm.get_cpu_times()
         self.assertEqual(data['system'], 87)
 
     def test_memory_stat_cache(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['cache'], 0)
 
     def test_memory_stat_rss(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['rss'], 7569408)
 
     def test_memory_stat_mapped_file(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['mapped_file'], 0)
 
     def test_memory_stat_pgpgin(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['pgpgin'], 3465)
 
     def test_memory_stat_pgpgout(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['pgpgout'], 1596)
 
     def test_memory_stat_pgfault(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['pgfault'], 4587)
 
     def test_memory_stat_pgmajfault(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['pgmajfault'], 0)
 
     def test_memory_stat_active_anon(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['active_anon'], 6217728)
 
     def test_memory_stat_inactive_anon(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['inactive_anon'], 0)
 
     def test_memory_stat_active_file(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['active_file'], 0)
 
     def test_memory_stat_inactive_file(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['inactive_file'], 1081344)
 
     def test_memory_stat_unevictable(self):
-        data = self.dm.get_memory_usage(
-            _alt_path="./tests/entities/data/memory.stat")
+        data = self.dm.get_memory_usage()
         self.assertEqual(data['unevictable'], 0)
