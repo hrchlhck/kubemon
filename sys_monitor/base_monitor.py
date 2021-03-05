@@ -114,5 +114,5 @@ class BaseMonitor(object):
             pods = self.pods
             for pod, containers in pods.items():
                 for container in containers:
-                    t = Thread(target=self.collect, args=(pod, container))
+                    t = Thread(target=self.collect, kwargs={'container': container, 'pod': pod})
                     t.start()
