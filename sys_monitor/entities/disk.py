@@ -52,8 +52,8 @@ class Partition:
 class Disk(BaseEntity):
     """ Class for retrieving data about disk partitions from a Linux based system """
 
-    def __init__(self, name, _disk_stat_path="/proc/diskstats", _partition_path="/proc/partitions"):
-        self.__name = name
+    def __init__(self, disk_name, _disk_stat_path="/proc/diskstats", _partition_path="/proc/partitions"):
+        self.__name = disk_name
         self._disk_stat_path = _disk_stat_path
         self._partition_path = _partition_path
         self.__parse_device_driver()
@@ -75,6 +75,12 @@ class Disk(BaseEntity):
     @property
     def minor(self):
         return self.__minor
+    
+    def __str__(self):
+        return f"Disk<maj={self.major}, min={self.minor}, name={self.name}>"
+    
+    def __repr__(self):
+        return self.__str__()
 
     def __parse_device_driver(self):
         """ Parse device driver version """
