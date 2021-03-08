@@ -57,6 +57,7 @@ class Disk(BaseEntity):
         self._disk_stat_path = _disk_stat_path
         self._partition_path = _partition_path
         self.__parse_device_driver()
+        self.__sector_size = self.__parse_sector_bytes(disk_name)
         self.__partitions = tuple(self.__get_partitions())
         super(Disk, self).__init__()
 
@@ -75,6 +76,10 @@ class Disk(BaseEntity):
     @property
     def minor(self):
         return self.__minor
+    
+    @property
+    def sector_size(self):
+        return self.__sector_size
     
     def __str__(self):
         return f"Disk<maj={self.major}, min={self.minor}, name={self.name}>"
@@ -99,6 +104,11 @@ class Disk(BaseEntity):
         # Set values
         self.__major = data[0]
         self.__minor = data[1]
+
+    def __parse_sector_bytes(self, partition: str):
+        """ Get disk sector size in bytes """
+        with open(f"/sys/block/{partition}/queue/hw_sector_size", mode='r') as fd:
+            return int(list(fd)[0])
 
     def get_usage(self, all_partitions=False, partition='sda') -> List[Partition]:
         """ Get information from a partition or from all available partitions started with 'sd' """

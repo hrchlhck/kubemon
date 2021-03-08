@@ -76,6 +76,10 @@ class TestDisk(unittest.TestCase):
                 errors += 1
         
         self.assertEqual(errors, 0)
+    
+    def test_sector_size(self):
+        self.sectors = self.disk.sector_size
+        self.assertEqual(512, self.sectors)
 
 
 
