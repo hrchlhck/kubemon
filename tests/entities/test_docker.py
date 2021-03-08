@@ -70,7 +70,9 @@ class TestDockerMonitor(unittest.TestCase):
             'Sync': 1769472,
             'Async': 0,
             'Discard': 0,
-            'Total': 1769472
+            'Total': 1769472,
+            'sectors_written': int(1769472 / 512),
+            'sectors_read': int(0 / 512)
         }
         self.assertEqual(data, expected)
 

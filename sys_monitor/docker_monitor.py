@@ -118,6 +118,8 @@ class DockerMonitor(BaseMonitor):
 
         # Map to dict
         ret = {k: v for k, v in data}
+        ret['sectors_written'] = int(ret['Write'] / disk.sector_size)
+        ret['sectors_read'] = int(ret['Read'] / disk.sector_size)
 
         return ret
 
