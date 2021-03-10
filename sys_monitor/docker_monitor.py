@@ -41,8 +41,8 @@ class DockerMonitor(BaseMonitor):
             stat (str): file inside cgroup_controller
             _alt_path (str): Alternative path to be gathering data
         """
-        if pod and not container:
-            ret = f"{self.stats_path}/{cgroup_controller}/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod{pod.id}.slice/docker-{container.id}.scope/{cgroup_controller}.{stat}"
+        if pod and container:
+            ret = f"{self.stats_path}/{cgroup_controller}/kubepods/besteffort/pod{pod.id}/{container.id}/{cgroup_controller}.{stat}"
         elif container and not pod: 
             ret = f"{self.stats_path}/{cgroup_controller}/system.slice/docker-{container.id}.scope/{cgroup_controller}.{stat}"
         else:
@@ -132,11 +132,12 @@ class DockerMonitor(BaseMonitor):
             container (Pair): Container pair namedtuple to be monitored
             _alt_path (str): Alternative path to be gathering data
         """
-        path = self.get_path(container=container, pod=pod, cgroup_controller='cpuacct', stat='stat')
+        path_cpuacct = self.get_path(container=container, pod=pod, cgroup_controller='cpuacct', stat='stat')
+        path_cpu = self.get_path(container=container, pod=pod, cgroup_controller='cpu', stat='stat')
         ret = dict()
 
-        with open(path, mode='r') as fd:
-            data = DockerMonitor.parse_fields(list(fd))
+        with open(path_cpuacct, mode='r') as fd_cpuacct, open(path_cpu, mode='r') as fd_cpu:
+            data = DockerMonitor.parse_fields(list(fd_cpuacct) + list(fd_cpu))
 
         return data
 
@@ -153,7 +154,7 @@ class DockerMonitor(BaseMonitor):
 
         return ProcessMonitor.get_net_usage(get_container_pid(container.container))
 
-    def get_stats(self, container: Pair, pod: Pod=None) -> dict:
+    def get_stats(self, container: Pair, pod: Pod=None, disk_name="sda") -> dict:
         """ 
         Get all metrics of a given container within a pod 
 
@@ -164,14 +165,14 @@ class DockerMonitor(BaseMonitor):
         cpu = self.get_cpu_times(container, pod)
         memory = self.get_memory_usage(container, pod)
         network = self.get_net_usage(container)
-        disk = self.get_disk_usage(container, pod, disk_name='sdb')
+        disk = self.get_disk_usage(container, pod, disk_name=disk_name)
 
         sleep(self.interval)
 
         cpu_new = subtract_dicts(cpu, self.get_cpu_times(container, pod))
         memory_new = subtract_dicts(memory, self.get_memory_usage(container, pod))
         network_new = subtract_dicts(network, self.get_net_usage(container))
-        disk_new = subtract_dicts(disk, self.get_disk_usage(container, pod, disk_name='sdb'))
+        disk_new = subtract_dicts(disk, self.get_disk_usage(container, pod, disk_name=disk_name))
 
         ret = {**cpu_new, **memory_new, **network_new, **disk_new}
         return ret

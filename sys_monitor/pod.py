@@ -28,7 +28,10 @@ def get_container_name_by_id(container_id: str):
 
 def parse_container_id(container_id: str):
     """ Parse container ID from cgroups directory """
-    return _split("[.-]", container_id)[1]
+    pattern = ".-"
+    if any(c for c in pattern if c in container_id):
+        return _split("[.-]", container_id)[1]
+    return container_id
 
 class Pod:
     """ Class to represent (simply) a Pod object from Kubernetes """
@@ -67,7 +70,7 @@ class Pod:
             slices = container.name.split("_")
         else:
             raise ValueError("Object of type %s is not a pod or container" % type(container))
-        pod_id = slices[4].replace("-", "_")
+        pod_id = slices[4].replace("-", "_") if '_' in slices[4] else slices[4]
         pod_namespace = slices[3]
         return Pod(container.name, pod_id, pod_namespace)
 
@@ -113,9 +116,9 @@ class Pod:
         pods = Pod.list_pods(**kwargs) 
         ret = {}
         for pod in pods:
-            pod_path = Path("/sys/fs/cgroup/%s/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod%s.slice/" % (cgroup_controller, pod.id))
+            pod_path = Path("/sys/fs/cgroup/%s/kubepods/besteffort/pod%s/" % (cgroup_controller, pod.id))
 
-            container_filter = filter(lambda x: x.startswith("docker"), os.listdir(pod_path))
+            container_filter = filter(lambda x: os.path.isdir(os.path.join(pod_path, x)), os.listdir(pod_path))
 
             # Avoiding containers that the name contains `sys` and `POD`
             containers = list(filter(lambda pair: 'POD' not in pair.name and 'sys' not in pair.name, map(map_func, container_filter)))
