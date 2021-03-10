@@ -194,6 +194,9 @@ def receive(_socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> s
 
 
 @wrap_exceptions(KeyboardInterrupt)
-def send_to(_socket: socket.socket, data: object) -> None:
-    _socket.send(pickle.dumps(data))
+def send_to(_socket: socket.socket, data: object, to_group=False, group=tuple()) -> None:
+    if not to_group:
+        _socket.send(pickle.dumps(data))
+    else:
+        _socket.sendto(pickle.dumps(data), group)
 

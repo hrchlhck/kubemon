@@ -86,8 +86,8 @@ class ProcessMonitor(BaseMonitor):
             iface (str): The network interface that you want to get the usage
         """
         # Network interface
-        nic = list(nic for nic in parse_proc_net(
-            pid) if nic['iface'] == iface)[0]
+        nic = list(nic for nic in parse_proc_net(pid)
+                   if nic['iface'] == iface)[0]
         ret = dict()
         ret['rx_bytes'] = nic['rx']['bytes']
         ret['rx_packets'] = nic['rx']['packets']
@@ -139,7 +139,8 @@ class ProcessMonitor(BaseMonitor):
 
         for child in process.children():
             func_args = (self.interval, child.pid)
-            args = (self.get_pchild_usage, func_args, self.name, container_name, child.pid)
+            args = (self.get_pchild_usage, func_args,
+                    self.name, container_name, child.pid)
             t = Thread(target=self.send, args=args)
             t.start()
 
