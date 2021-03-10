@@ -99,11 +99,13 @@ class Disk(BaseEntity):
         data = list(map(lambda x: (int(x[0]), int(x[1]), x[2]), data))
 
         # Filter by device name
-        data = list(filter(lambda x: x[2] == self.name, data))[0]
+        data = list(filter(lambda x: x[2] == self.name, data))
 
         # Set values
-        self.__major = data[0]
-        self.__minor = data[1]
+        if data:
+            self.__major = data[0][0]
+            self.__minor = data[0][1]
+
 
     def __parse_sector_bytes(self, partition: str):
         """ Get disk sector size in bytes """
