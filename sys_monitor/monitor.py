@@ -12,7 +12,7 @@ class OSMonitor(BaseMonitor):
         super(OSMonitor, self).__init__(*args, **kwargs)
 
     def __get_data(self):
-        disk = Disk().get_usage()
+        disk = Disk(disk_name='sda').get_usage()
         cpu = CPU().get_usage
         net = Network().get_usage
         mem = BaseMonitor.get_memory_usage()
