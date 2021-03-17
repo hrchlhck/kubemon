@@ -1,5 +1,5 @@
 import docker
-from .utils import get_containers, get_container_pid, format_name, try_connect, receive, send_to
+from .utils import get_containers, get_container_pid, format_name, try_connect, receive, send_to, filter_dict
 from .exceptions import PidNotExistException
 from .decorators import wrap_exceptions
 from .constants import START_MESSAGE
@@ -43,13 +43,16 @@ class BaseMonitor(object):
         """
         if pid and str(pid) not in os.listdir('/proc'):
             raise PidNotExistException("Pid %s does not exist" % pid)
-        
+
         if not pid:
+            fields = ['nr_active_file', 'nr_inactive_file', 'nr_mapped', 'nr_active_anon', 'nr_inactive_anon', 'pgpgin', 'pgpgout', 'pgfree', 'pgfault', 'pgmajfault', 'pgreuse']
+            
             def to_dict(nested_lists): return {k: int(v) for k, v in map(
                 lambda atom_list: atom_list.split(), nested_lists)}
 
             with open("/proc/vmstat", mode="r") as fd:
                 ret = to_dict(fd.readlines())
+                ret = filter_dict(ret, fields)
         else:
             with open('/proc/%s/statm' % pid, mode='r') as fd:
                 infos = ['size', 'resident', 'shared',
@@ -86,11 +89,13 @@ class BaseMonitor(object):
 
                     print(ret)
 
-                    source = "%s_%s_%s" % (
-                        _from, format_name(container_name), pid)
-                    message = {"source": source, "data": ret}
+                    source = f"{_from}_{format_name(container_name)}_{pid}"
 
-                    send_to(sock, message)
+                    print(source)
+
+                    message = {"source": str(source), "data": dict(ret)}
+
+                    send_to(sock, message, to_group=False)
 
                     print(receive(sock))
 
@@ -101,7 +106,7 @@ class BaseMonitor(object):
         class_name = self.name
 
         if "OSMonitor" == class_name:
-            self.send(self.collect, _from=class_name)
+            self.send(self.collect, [self.interval], _from=class_name)
         elif "ProcessMonitor" == class_name:
             client = docker.from_env()
             containers = get_containers(client)
@@ -114,5 +119,6 @@ class BaseMonitor(object):
             pods = self.pods
             for pod, containers in pods.items():
                 for container in containers:
-                    t = Thread(target=self.collect, kwargs={'container': container, 'pod': pod})
+                    t = Thread(target=self.collect, kwargs={
+                               'container': container, 'pod': pod})
                     t.start()
