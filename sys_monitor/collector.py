@@ -70,17 +70,17 @@ class Collector(object):
 
         while True:
             try:
-                data = receive(client)
+                data = receive(client, buffer_size=1024 * 3, encoding_type='')
+
+                print("Received {} from {}:{}".format(data, *address))
 
                 if isinstance(data, dict):
                     data = Dict(data)
+                    file_name = f"{data.source}_{address[0].replace('.', '_')}_{address[1]}"
+                    save_csv(data.data, file_name, dir_name=data.source.split('_')[0])
 
-                print("Received {} from {}:{}".format(data.data, *address))
-                send_to(client, "OK - {}".format(datetime.now()))
-                file_name = "%s_%s_%s" % (
-                    data.source, address[0].replace(".", "_"), address[1])
-                save_csv(data.data, file_name,
-                        dir_name=data.source.split('_')[0])
+                send_to(client, f"OK - {datetime.now()}")
+
             except (ConnectionAbortedError, ConnectionResetError, EOFError) as e:
                 if client in self.__clients:
                     self.__mutex.acquire()
