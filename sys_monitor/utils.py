@@ -17,8 +17,12 @@ import csv
 import sys
 import pickle
 
+__all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data',
+           'save_csv', 'format_name', 'get_containers', 'get_container_pid', 'try_connect', 'receive', 'send_to']
+
 # Represents a pair for a container
 Pair = namedtuple('Pair', ['container', 'name'])
+
 
 def subtract_dicts(dict1: dict, dict2: dict) -> dict:
     """ Subtracts values from dict1 and dict2 """
@@ -149,11 +153,12 @@ def get_containers(client: docker.client.DockerClient, platform=sys.platform, na
         to_tuple (bool): Return a list of namedtuples that represent a pair of container and container name 
     """
     containers = client.containers.list()
-    _filter = lambda x: 'POD' not in x.name and namespace in x.name
+    def _filter(x): return 'POD' not in x.name and namespace in x.name
 
     if not to_tuple:
         return list(filter(_filter, containers))
     return list(map(lambda container: Pair(container, container.name), filter(_filter, containers)))
+
 
 def get_container_pid(container):
     cmd = ['docker', 'inspect', '-f', '{{.State.Pid}}', container.id]
@@ -190,13 +195,19 @@ def receive(_socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> s
         buffer_size (int): Size of the buffer used by socket.recv() method;
         encoding_type (str): Encoding type for decoding incoming data.
     """
-    return pickle.loads(_socket.recv(buffer_size), encoding=encoding_type)
+    # UDP
+    addr = None
+    if _socket.type == 2:
+        data, addr = _socket.recvfrom(buffer_size)
+    else:
+        data = _socket.recv(buffer_size)
+    return pickle.loads(data, encoding=encoding_type), addr
 
 
 @wrap_exceptions(KeyboardInterrupt)
-def send_to(_socket: socket.socket, data: object, to_group=False, group=tuple()) -> None:
-    if not to_group:
-        _socket.send(pickle.dumps(data))
+def send_to(_socket: socket.socket, data: object, address=tuple()) -> None:
+    # UDP
+    if _socket.type == 2 and address:
+        _socket.sendto(pickle.dumps(data), address)
     else:
-        _socket.sendto(pickle.dumps(data), group)
-
+        _socket.send(pickle.dumps(data))
