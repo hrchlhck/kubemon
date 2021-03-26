@@ -17,7 +17,7 @@ def get_system(sys_type, args):
         elif sys_type == 'process':
             return ProcessMonitor(address=args.host, port=int(args.port))
         elif sys_type == 'docker':
-            return DockerMonitor(address=args.host, port=int(args.port), namespace=args.namespace)
+            return DockerMonitor(address=args.host, port=int(args.port))
         elif sys_type == 'cli':
             return CollectorClient(address=args.host, port=int(args.port))
     elif not args.host:
@@ -29,7 +29,6 @@ parser.add_argument('-t', '--type', help='Functionality of sys-monitor. E.g. col
 parser.add_argument('-H', '--host', default='0.0.0.0', help='Host that any of sys-monitor functions will be connecting', metavar='IP')
 parser.add_argument('-p', '--port', default=9822, help='Port of the host')
 parser.add_argument('-f', '--files', nargs=2, help='Files for merge', metavar=('FILE1', 'FILE2'))
-parser.add_argument('-n', '--namespace', default='default', help="Namespace of the pods you want to collect data")
 parser.add_argument('-c', '--command', default="", help="Command for be executing on CollectorClient")
 
 args = parser.parse_args()
