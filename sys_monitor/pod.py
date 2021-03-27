@@ -1,129 +1,128 @@
 from pathlib import Path
-from functools import lru_cache
 from docker.models.containers import Container
 from typing import List, NamedTuple
-from collections import namedtuple
+from collections import namedtuple, deque
 from subprocess import check_output
-from re import split as _split
+import re
+import docker
 import os
 import sys
 
 __all__ = ['Pod', 'Pair']
 
-Pair = namedtuple('Pair', ['container', 'name', 'id'])
+Pair = namedtuple('Pair', ['name', 'id'])
+
 
 def get_container_name_by_id(container_id: str):
     """ Get container name by an given id. """
     if isinstance(container_id, str):
         cmd = "docker inspect -f {{.Name}} %s" % container_id
         ret = check_output(cmd.split()).decode("utf8")
-        
+
         # Remove junk characters
         for char in "/\n":
             ret = ret.replace(char, "")
-        
+
         return ret
     else:
-        raise ValueError("Object of type %s is not a container" % type(container))
+        raise ValueError("Object of type %s is not a container" %
+                         type(container))
+
 
 def parse_container_id(container_id: str):
     """ Parse container ID from cgroups directory """
     pattern = ".-"
     if any(c for c in pattern if c in container_id):
-        return _split("[.-]", container_id)[1]
+        return re.split("[.-]", container_id)[1]
     return container_id
+
 
 class Pod:
     """ Class to represent (simply) a Pod object from Kubernetes """
-    def __init__(self, name, _id, namespace):
+
+    def __init__(self, name: str, uid: str, containers: List[Container]=list()):
         self.__name = name
-        self.__id = _id
-        self.__namespace = namespace
-    
+        self.__id = uid
+        self.__containers = containers
+
     @property
-    def name(self):
+    def name(self) -> str:
         return self.__name
-    
+
     @property
-    def id(self):
+    def id(self) -> str:
         return self.__id
-    
+
     @property
-    def namespace(self):
-        return self.__namespace
+    def containers(self) -> List[Container]:
+        return self.__containers
+    
+    @containers.setter
+    def containers(self, other: List[Container]) -> None:
+        self.__containers = other
+    
+    def path(self, controller: str, qos="besteffort") -> str:
+        """ 
+        Returns the path of the pod on a cgroup controller 
+        
+        Args:
+            controller (str): cgroup controller
+            qos (str): QoS class from Kubernetes
+        
+        """
+        return f"/sys/fs/cgroup/{controller}/kubepods/{qos}/pod{self.id}"
 
     def __repr__(self):
-        return "Pod<Name=%s, id=%s, namespace=%s>" % (self.name, self.id, self.namespace)
-    
+        return "Pod<Name=%s, id=%s, containers=%s>" % (self.name, self.id, self.containers)
+
     def __str__(self):
-        return self.__repr__()    
+        return self.__repr__()
 
     @staticmethod
-    def parse_pod_name(container=None):
+    def parse_pod_name(container_name: str) -> object:
         """ 
         Parses pod names based Kubernetes naming pattern.
 
         Args:
-            container (Container): Container object 
+            container_name (str): Container name 
         """
-        if isinstance(container, Container) or isinstance(container, Pod): 
-            slices = container.name.split("_")
-        else:
-            raise ValueError("Object of type %s is not a pod or container" % type(container))
-        pod_id = slices[4].replace("-", "_") if '_' in slices[4] else slices[4]
-        pod_namespace = slices[3]
-        return Pod(container.name, pod_id, pod_namespace)
+        pattern = r"([a-f-0-9]){8}-([a-f-0-9]){4}-([a-f-0-9]){4}-([a-f-0-9]){4}-([a-f-0-9]){12}"
+        pod_id = re.search(pattern, container_name).group()
+        return Pod(container_name, uid=pod_id)
 
     @staticmethod
-    @lru_cache(maxsize=32)
-    def list_pods(client, namespace='') -> List[Container]:
-        """ 
-        List all running pods on Kubernetes as docker containers. 
-
-        Args:
-            client (docker.client.DockerClient): Docker client object
-            namespace (str): Pod namespace
-        """
-        containers = client.containers.list()
-        return [Pod.parse_pod_name(pod) for pod in containers if 'POD' in pod.name and namespace in pod.name]
-
-    @staticmethod
-    @lru_cache(maxsize=32)
-    def list_containers_cgroups(cgroup_controller, **kwargs) -> dict:
+    def list_pods(namespace: str, controller='systemd', qos="besteffort") -> list:
         """ 
         List containers within the pod on cgroups.
-        
-        Args:
-            client (docker.client.DockerClient): Docker client object
-            namespace (str): Pod namespace
-            cgroup_controller (str): Cgroup controller. To see all available controlers, 
-            please refer to https://www.man7.org/linux/man-pages/man7/cgroups.7.html
 
-        Returns:
-            Dictionary where the key is the pod name and the value are the containers within the pod
-            E.g.
-                >>> {'pod1': [Pair(container=<Container object 1>, name='container1', id='container1')], ...}
+        Args:
+            namespace (str): Pod namespace
+            controller (str): cgroup controller
+            qos (str): QoS class from kubernetes
         """
         if sys.platform.startswith("win"):
             raise OSError("Current operating system not supported")
+
+        path = f"/sys/fs/cgroup/{controller}/kubepods/{qos}/"
+
+        client = docker.from_env()
+
+        # Get containers that arent pods
+        containers = [c for c in client.containers.list() if 'POD' not in c.name and namespace in c.name]
+
+        # Get containers that are pods
+        pods = [c for c in client.containers.list() if 'POD' in c.name and namespace in c.name]
+
+        # Map container names and container IDs
+        containers = [Pair(c.name, c.id) for c in containers]
+
+        # Map containers into pod objects
+        pods = [Pod.parse_pod_name(pod.name) for pod in pods]
         
-        def map_func(container_id: str):
-            container_id = parse_container_id(container_id)
-            container_obj = kwargs.get("client").containers.get(container_id)
-            container_name = get_container_name_by_id(container_id)
-            return Pair(container_obj, container_name, container_id)
-        
-        pods = Pod.list_pods(**kwargs) 
-        ret = {}
-        for pod in pods:
-            pod_path = Path("/sys/fs/cgroup/%s/kubepods/besteffort/pod%s/" % (cgroup_controller, pod.id))
+        # Filter pod container from cgroups dir
+        for pod in pods:           
+            filtered_containers = [c for c in containers if c.id in os.listdir(pod.path(controller, qos=qos))]
 
-            container_filter = filter(lambda x: os.path.isdir(os.path.join(pod_path, x)), os.listdir(pod_path))
+            pod.containers = filtered_containers
 
-            # Avoiding containers that the name contains `sys` and `POD`
-            containers = list(filter(lambda pair: 'POD' not in pair.name and 'sys' not in pair.name, map(map_func, container_filter)))
-
-            ret[Pod.parse_pod_name(pod)] = containers
-
-        return ret
-
+        return pods
