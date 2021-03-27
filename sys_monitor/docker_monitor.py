@@ -7,7 +7,6 @@ from .pod import *
 from threading import Thread
 from time import sleep
 from typing import List
-import docker
 import psutil
 import time
 import os
@@ -16,11 +15,11 @@ import sys
 __all__ = ['DockerMonitor']
 
 class DockerMonitor(BaseMonitor):
-    def __init__(self, kubernetes=True, namespace='k8s-bigdata', stats_path="/sys/fs/cgroup", *args, **kwargs):
+    def __init__(self, kubernetes=True, namespace='default', stats_path="/sys/fs/cgroup", *args, **kwargs):
         super(DockerMonitor, self).__init__(*args, **kwargs)
         self.__stats_path = stats_path
         if kubernetes:
-            self.__pods = Pod.list_containers_cgroups('systemd', namespace=namespace, client=docker.from_env())
+            self.__pods = Pod.list_pods(namespace=namespace)
 
     @property
     def pods(self):
@@ -110,7 +109,7 @@ class DockerMonitor(BaseMonitor):
 
         with open(path, mode='r') as fd:
             data = DockerMonitor.parse_fields(list(fd))
-
+                        
         # Filter blkio stats by disk maj:min
         data = filter(lambda x: len(x) == 3, data)
         data = filter(lambda x: x[0] == dev, data)
@@ -118,8 +117,10 @@ class DockerMonitor(BaseMonitor):
 
         # Map to dict
         ret = {k: v for k, v in data}
-        ret['sectors_written'] = int(ret['Write'] / disk.sector_size)
-        ret['sectors_read'] = int(ret['Read'] / disk.sector_size)
+
+        if 'Write' in ret and 'Read' in ret:
+            ret['sectors_written'] = int(ret['Write'] / disk.sector_size)
+            ret['sectors_read'] = int(ret['Read'] / disk.sector_size)
 
         return ret
 
@@ -152,9 +153,9 @@ class DockerMonitor(BaseMonitor):
             _alt_path (str): Alternative path to be gathering data
         """
 
-        return ProcessMonitor.get_net_usage(get_container_pid(container.container))
+        return ProcessMonitor.get_net_usage(get_container_pid(container))
 
-    def get_stats(self, container: Pair, pod: Pod=None, disk_name="sda") -> dict:
+    def get_stats(self, container: Pair, pod: Pod=None, disk_name="sdb") -> dict:
         """ 
         Get all metrics of a given container within a pod 
 
@@ -186,7 +187,7 @@ class DockerMonitor(BaseMonitor):
             container (Pair): Container pair namedtuple to be monitored
         """
         func_args = (container, pod)
-        super(DockerMonitor, self).send(function=self.get_stats, function_args=func_args, _from=self.name, container_name=container.name)
+        super(DockerMonitor, self).send(function=self.get_stats, function_args=func_args, container_name=container.name, pid=get_container_pid(container))
 
     def start(self) -> None:
         super(DockerMonitor, self).start()

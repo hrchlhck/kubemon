@@ -138,10 +138,8 @@ class ProcessMonitor(BaseMonitor):
         process = psutil.Process(pid=pid)
 
         for child in process.children():
-            func_args = (self.interval, child.pid)
-            args = (self.get_pchild_usage, func_args,
-                    self.name, container_name, child.pid)
-            t = Thread(target=self.send, args=args)
+            kwargs = {"function_args": (self.interval, child.pid), "pid": child.pid, "container_name": container_name, "function": self.get_pchild_usage}
+            t = Thread(target=self.send, kwargs=kwargs)
             t.start()
 
     def start(self) -> None:
