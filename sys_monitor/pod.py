@@ -91,12 +91,12 @@ class Pod:
         return Pod(container_name, uid=pod_id)
 
     @staticmethod
-    def list_pods(namespace: str, controller='systemd', qos="besteffort") -> list:
+    def list_pods(namespace="kube-system", controller='systemd', qos="besteffort") -> list:
         """ 
         List containers within the pod on cgroups.
 
         Args:
-            namespace (str): Pod namespace
+            namespace (str): Avoid the given namespace
             controller (str): cgroup controller
             qos (str): QoS class from kubernetes
         """
@@ -108,10 +108,10 @@ class Pod:
         client = docker.from_env()
 
         # Get containers that arent pods
-        containers = [c for c in client.containers.list() if 'POD' not in c.name and namespace in c.name]
+        containers = [c for c in client.containers.list() if 'POD' not in c.name and namespace not in c.name]
 
         # Get containers that are pods
-        pods = [c for c in client.containers.list() if 'POD' in c.name and namespace in c.name]
+        pods = [c for c in client.containers.list() if 'POD' in c.name and namespace not in c.name]
 
         # Map container names and container IDs
         containers = [Pair(c.name, c.id) for c in containers]

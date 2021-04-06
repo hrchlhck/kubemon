@@ -15,11 +15,11 @@ import sys
 __all__ = ['DockerMonitor']
 
 class DockerMonitor(BaseMonitor):
-    def __init__(self, kubernetes=True, namespace='default', stats_path="/sys/fs/cgroup", *args, **kwargs):
+    def __init__(self, kubernetes=True, stats_path="/sys/fs/cgroup", *args, **kwargs):
         super(DockerMonitor, self).__init__(*args, **kwargs)
         self.__stats_path = stats_path
         if kubernetes:
-            self.__pods = Pod.list_pods(namespace=namespace)
+            self.__pods = Pod.list_pods()
 
     @property
     def pods(self):

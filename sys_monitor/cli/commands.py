@@ -29,6 +29,6 @@ parser.add_argument('-t', '--type', help='Functionality of sys-monitor. E.g. col
 parser.add_argument('-H', '--host', default='0.0.0.0', help='Host that any of sys-monitor functions will be connecting', metavar='IP')
 parser.add_argument('-p', '--port', default=9822, help='Port of the host')
 parser.add_argument('-f', '--files', nargs=2, help='Files for merge', metavar=('FILE1', 'FILE2'))
-parser.add_argument('-c', '--command', default="", help="Command for be executing on CollectorClient")
+parser.add_argument('-c', '--command', default="", nargs='*', help="Command for be executing on CollectorClient")
 
 args = parser.parse_args()

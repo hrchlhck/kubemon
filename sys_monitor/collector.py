@@ -2,13 +2,16 @@ from .constants import START_MESSAGE
 from .utils import save_csv, receive, send_to
 from addict import Dict
 from datetime import datetime
-from collections import deque
+from collections import deque, namedtuple
 from sty import fg, rs, ef
+from os.path import join as join_path
 import socket
 import traceback
 import threading
 import sys
 
+# Namedtuple to represent a socket client returned by socket.accept()
+Client = namedtuple('Client', ['socket_object', 'address'])
 
 def start_thread(func, args=tuple()):
     """
@@ -29,6 +32,7 @@ class Collector(object):
         self.__mutex = threading.Lock()
         self.__instances = deque()
         self.__tag = f"[ {fg(255, 200, 100)}{self.__class__.__name__}{fg.rs} ] "
+        self.dir_name = None
 
     @property
     def address(self):
@@ -67,14 +71,18 @@ class Collector(object):
             data, addr = receive(client)
 
             print("\t[ {}*{} ] Command '{}' received from {}:{}".format(fg(0, 90, 255), fg.rs, data, *addr), flush=True)
-            if data:
-                if data == "/start":
+            if data:                
+                cmd = data[0] # Command
+
+                if cmd == "/start":
+                    if len(data) == 2:
+                        self.dir_name = data[1]
                     if self.connected_instances == 0:
                         message = f"There are no connected monitors to be started"
                     else:
                         message = f"Starting {self.connected_instances} monitors"
                         self.__start_instances()
-                elif data == "/instances":
+                elif cmd == "/instances":
                     message = f"Connected instances: {self.connected_instances}"
                 else:
                     message = "Command does not exist"
@@ -122,6 +130,8 @@ class Collector(object):
     def __listen_to_client(self, client: socket.socket, address: tuple) -> None:
         print("{}Creating new thread for client {}:{}".format(self.__tag, *address), flush=True)
 
+        _client = Client(client, client.getsockname())
+
         while True:
             try:
                 data, _ = receive(client, buffer_size=2048)
@@ -130,13 +140,19 @@ class Collector(object):
 
                 if isinstance(data, dict):
                     data = Dict(data)
-                    save_csv(data.data, data.source, dir_name=data.source.split('_')[0])
+                    
+                    dir_name = data.source
+                    if self.dir_name:
+                        dir_name = join_path(self.dir_name, data.source.split("_")[0])
+                    
+                    save_csv(data.data, data.source, dir_name=dir_name)
 
                 send_to(client, f"OK - {datetime.now()}")
 
             except:
                 traceback.print_exc()
-                print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] {client}", flush=True)
+                addr, port = _client.address
+                print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] {addr}:{port}", flush=True)
                 self.mutex.acquire()
                 self.__instances.remove(client)
                 self.mutex.release()
