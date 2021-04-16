@@ -19,7 +19,7 @@ class DockerMonitor(BaseMonitor):
         super(DockerMonitor, self).__init__(*args, **kwargs)
         self.__stats_path = stats_path
         if kubernetes:
-            self.__pods = Pod.list_pods()
+            self.__pods = Pod.list_pods(namespace="*")
 
     @property
     def pods(self):
