@@ -11,6 +11,4 @@ ADD main.py .
 RUN python setup.py install \
     && chmod +x main.py
 
-EXPOSE 9822 9880/udp
-
 ENTRYPOINT ["python3", "main.py"]

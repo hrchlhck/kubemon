@@ -23,4 +23,4 @@ clean:
 
 collector:
 	@clear
-	@docker run -v /tmp/data:/tmp/data --rm --name collector  -it vpemfh7/sys-monitor:latest -t collector
+	@docker run -p 9822:9822 -p 9880:9880/udp -v /tmp/data:/tmp/data --rm --name collector -it vpemfh7/sys-monitor:latest -t collector -H 0.0.0.0 -p 9822
