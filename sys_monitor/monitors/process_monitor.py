@@ -1,5 +1,5 @@
-from .utils import subtract_dicts
 from threading import Thread
+from ..utils import subtract_dicts
 from .base_monitor import BaseMonitor
 from time import sleep
 import psutil

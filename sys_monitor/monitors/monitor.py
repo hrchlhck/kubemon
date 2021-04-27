@@ -1,8 +1,8 @@
 from .base_monitor import BaseMonitor
-from .entities.cpu import CPU
-from .entities.disk import Disk
-from .entities.network import Network
-from .utils import subtract_dicts
+from ..entities.cpu import CPU
+from ..entities.disk import Disk
+from ..entities.network import Network
+from ..utils import subtract_dicts
 from time import sleep
 import psutil
 

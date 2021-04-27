@@ -1,4 +1,4 @@
-from .utils import filter_dict, load_json, join_url, merge_dict, subtract_dicts
+from ..utils import filter_dict, load_json, join_url, merge_dict, subtract_dicts
 from threading import Thread, Lock
 from requests import post
 from socket import gethostname, gethostbyname

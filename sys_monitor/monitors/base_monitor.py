@@ -1,11 +1,11 @@
-import docker
-from .utils import get_containers, get_container_pid, format_name, try_connect, receive, send_to, filter_dict
-from .exceptions import PidNotExistException
-from .decorators import wrap_exceptions
-from .constants import START_MESSAGE
+from ..utils import get_containers, get_container_pid, format_name, try_connect, receive, send_to, filter_dict
+from ..exceptions import PidNotExistException
+from ..decorators import wrap_exceptions
+from ..constants import START_MESSAGE
 from typing import Callable
 from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket, gethostname, gethostbyname
 from threading import Thread
+import docker
 import os
 
 

@@ -1,4 +1,4 @@
-from .utils import receive, send_to
+from ..utils import receive, send_to
 import socket
 import sys
 

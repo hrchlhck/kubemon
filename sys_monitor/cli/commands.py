@@ -1,9 +1,6 @@
-from ..monitor import OSMonitor
-from ..collector import Collector
-from ..spark_monitor import SparkMonitor
-from ..process_monitor import ProcessMonitor
-from ..docker_monitor import DockerMonitor
-from ..collector_client import CollectorClient
+from ..monitors import *
+from ..collector import *
+
 import argparse
 
 SYSTEMS = ['collector', 'monitor', 'process', 'docker']
