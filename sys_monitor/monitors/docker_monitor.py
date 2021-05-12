@@ -6,10 +6,6 @@ from ..pod import *
 from threading import Thread
 from time import sleep
 from typing import List
-import psutil
-import time
-import os
-import sys
 
 __all__ = ['DockerMonitor']
 
@@ -151,8 +147,9 @@ class DockerMonitor(BaseMonitor):
             container (Pair): Container pair namedtuple to be monitored
             _alt_path (str): Alternative path to be gathering data
         """
-
-        return ProcessMonitor.get_net_usage(get_container_pid(container))
+        ret = ProcessMonitor.get_net_usage(get_container_pid(container))
+        
+        return ret
 
     def get_stats(self, container: Pair, pod: Pod=None, disk_name="sdb") -> dict:
         """ 

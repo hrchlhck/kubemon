@@ -25,9 +25,10 @@ class OSMonitor(BaseMonitor):
 
         return data
 
-    def collect(self, interval):
+    def collect(self):
         data = self.__get_data()
-        sleep(interval)
+
+        sleep(self.interval)
 
         data_new = self.__get_data()
 

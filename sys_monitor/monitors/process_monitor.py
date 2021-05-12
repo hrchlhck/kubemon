@@ -56,6 +56,7 @@ class ProcessMonitor(BaseMonitor):
         ret['cpu_children_user'] = cpu_data.children_user
         ret['cpu_children_system'] = cpu_data.children_system
         ret['cpu_iowait'] = cpu_data.iowait
+
         return ret
 
     @staticmethod
@@ -74,6 +75,7 @@ class ProcessMonitor(BaseMonitor):
         ret['io_write_bytes'] = io_counters.write_bytes
         ret['io_read_chars'] = io_counters.read_chars
         ret['io_write_chars'] = io_counters.write_chars
+
         return ret
 
     @staticmethod
@@ -93,6 +95,7 @@ class ProcessMonitor(BaseMonitor):
         ret['rx_packets'] = nic['rx']['packets']
         ret['tx_bytes'] = nic['tx']['bytes']
         ret['tx_packets'] = nic['tx']['packets']
+
         return ret
 
     @classmethod

@@ -42,7 +42,7 @@ class BaseMonitor(object):
                        it will return based on a given pid.
         """
         if pid and str(pid) not in os.listdir('/proc'):
-            raise PidNotExistException("Pid %s does not exist" % pid)
+            print(f"No pid {pid}")
 
         if not pid:
             fields = ['nr_active_file', 'nr_inactive_file', 'nr_mapped', 'nr_active_anon', 'nr_inactive_anon', 'pgpgin', 'pgpgout', 'pgfree', 'pgfault', 'pgmajfault', 'pgreuse']
@@ -119,16 +119,15 @@ class BaseMonitor(object):
                     send_to(sock, message)
 
                     recv, _ = receive(sock)
-                    print(recv, flush=True)
 
     def collect(self):
         """ Method to be implemented by child classes """
 
     def start(self):
         class_name = self.name
-
+        
         if "OSMonitor" == class_name:
-            self.send(function=self.collect, function_args=[self.interval])
+            self.send(function=self.collect, function_args=[])
         elif "ProcessMonitor" == class_name:
             client = docker.from_env()
             containers = get_containers(client)
