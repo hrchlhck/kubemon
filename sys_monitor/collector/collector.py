@@ -71,6 +71,7 @@ class Collector(object):
             data, addr = receive(client)
 
             print("\t[ {}*{} ] Command '{}' received from {}:{}".format(fg(0, 90, 255), fg.rs, data, *addr), flush=True)
+
             if data:                
                 cmd = data[0] # Command
 
@@ -140,6 +141,8 @@ class Collector(object):
 
                 if isinstance(data, dict):
                     data = Dict(data)
+
+                    data.data.update({'timestamp': datetime.now()})
                     
                     dir_name = data.source
                     if self.dir_name:
@@ -150,9 +153,9 @@ class Collector(object):
                 send_to(client, f"OK - {datetime.now()}")
 
             except:
-                traceback.print_exc()
+                # traceback.print_exc()
                 addr, port = _client.address
-                print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] {addr}:{port}", flush=True)
+                print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] Unregistered {addr}:{port}", flush=True)
                 self.mutex.acquire()
                 self.__instances.remove(client)
                 self.mutex.release()
