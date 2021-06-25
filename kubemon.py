@@ -11,13 +11,20 @@ if __name__ == "__main__":
             print("Merge type requires --file/-f")
         else:
             merge(*args.files)
-    elif args.type in SYSTEMS:
+
+    if args.type in MODULES:
         get_system(args.type, args).start()
-    elif args.type == 'cli' and args.command:
+
+    if args.type == 'cli' and args.command:
         get_system(args.type, args).exec(args.command)
-    elif args.type == 'all':
-        for s in SYSTEMS[1:]:
+
+    if args.type == 'all':
+        for s in MODULES[1:]:
             s = get_system(s, args)
             Process(target=start, args=(s,)).start()
-    else:
-        print("Argument %s does not exist." % args.type)
+    
+    if args.list:
+        print("Available modules:")
+        for module in MODULES:
+            print(f"\t- {module.capitalize()}")
+            
