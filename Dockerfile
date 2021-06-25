@@ -5,10 +5,10 @@ WORKDIR /opt/
 STOPSIGNAL SIGINT
 
 ADD setup.py .
-ADD sys_monitor/ sys_monitor/
-ADD main.py .
+ADD kubemon/ kubemon/
+ADD kubemon.py .
 
-RUN python setup.py install \
-    && chmod +x main.py
+RUN pip install . \
+    && chmod +x kubemon.py
 
-ENTRYPOINT ["python3", "main.py"]
+ENTRYPOINT ["python3", "kubemon.py"]

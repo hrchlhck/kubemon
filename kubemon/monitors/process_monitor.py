@@ -1,7 +1,6 @@
 from threading import Thread
 from ..utils import subtract_dicts
 from .base_monitor import BaseMonitor
-from IPython import embed
 import psutil
 import sys
 import os

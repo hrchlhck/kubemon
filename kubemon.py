@@ -1,5 +1,5 @@
-from sys_monitor.cli import *
-from sys_monitor.merge import merge
+from kubemon.cli import *
+from kubemon.merge import merge
 from multiprocessing import Process
 
 def start(instance):
@@ -27,4 +27,3 @@ if __name__ == "__main__":
         print("Available modules:")
         for module in MODULES:
             print(f"\t- {module.capitalize()}")
-            

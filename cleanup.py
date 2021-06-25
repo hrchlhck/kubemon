@@ -1,9 +1,9 @@
-from sys_monitor.constants import BASE_DIR
+from kubemon.constants import BASE_DIR
 import shutil
 import os
 
 def cleanup():
-    for root, sub, _ in os.walk(os.path.join(BASE_DIR, "sys_monitor")):
+    for root, sub, _ in os.walk(os.path.join(BASE_DIR, "kubemon")):
         if root.startswith("."):
             continue
         for __pycache__ in sub:
