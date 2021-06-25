@@ -1,7 +1,7 @@
 from threading import Thread
 from ..utils import subtract_dicts
 from .base_monitor import BaseMonitor
-from time import sleep
+from IPython import embed
 import psutil
 import sys
 import os
@@ -79,7 +79,7 @@ class ProcessMonitor(BaseMonitor):
         return ret
 
     @staticmethod
-    def get_net_usage(pid: int, iface='eth0') -> dict:
+    def get_net_usage(pid: int, iface='eno0') -> dict:
         """ 
         Returns the network usage by a process 
 
@@ -88,8 +88,13 @@ class ProcessMonitor(BaseMonitor):
             iface (str): The network interface that you want to get the usage
         """
         # Network interface
-        nic = list(nic for nic in parse_proc_net(pid)
-                   if nic['iface'] == iface)[0]
+        nic = [nic for nic in parse_proc_net(pid) if nic['iface'] == iface]
+        
+        if len(nic) == 0:
+            return {'rx_bytes': 0, 'rx_packets': 0, 'tx_bytes': 0, 'tx_packets': 0}
+
+        nic = nic[0]
+        
         ret = dict()
         ret['rx_bytes'] = nic['rx']['bytes']
         ret['rx_packets'] = nic['rx']['packets']
@@ -111,27 +116,24 @@ class ProcessMonitor(BaseMonitor):
         cpu = cls.get_cpu_times(process)
         io = cls.get_io_counters(process)
         mem = BaseMonitor.get_memory_usage(pid=pid)
-        num_fds = process.num_fds()
         net = cls.get_net_usage(process.pid)
 
-        open_files = len(process.open_files())
-
+        # Acts as time.sleep()
         cpu_percent = process.cpu_percent(interval=interval)
 
         io_new = subtract_dicts(io, cls.get_io_counters(process))
         cpu_new = subtract_dicts(cpu, cls.get_cpu_times(process))
         mem_new = subtract_dicts(mem, BaseMonitor.get_memory_usage(pid=pid))
-        num_fds = process.num_fds() - num_fds
         net_new = subtract_dicts(net, cls.get_net_usage(process.pid))
-        open_files = len(process.open_files()) - open_files
 
-        ret = {**io_new, **cpu_new, **net_new, "cpu_percent": cpu_percent,
-               **mem_new, "num_fds": num_fds, "open_files": open_files}
+        ret = {**io_new, **cpu_new, **net_new, "cpu_percent": cpu_percent, **mem_new}
         return ret
 
     def collect(self, container_name: str, pid: int) -> None:
         """ 
-        Method to collects all data from all container processes
+        Method to collects all data from all container processes.
+
+        This function will create a thread for each process to collect data from.
 
         Args:
             container_name (str): Container name
