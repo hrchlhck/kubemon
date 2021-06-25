@@ -1,10 +1,9 @@
-from ..utils import get_containers, get_container_pid, format_name, try_connect, receive, send_to, filter_dict
-from ..exceptions import PidNotExistException
+from ..utils import get_containers, get_container_pid, receive, send_to, filter_dict
 from ..decorators import wrap_exceptions
 from ..constants import START_MESSAGE
 from typing import Callable
-from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket, gethostname, gethostbyname
 from threading import Thread
+import socket
 import docker
 import os
 
@@ -78,11 +77,11 @@ class BaseMonitor(object):
                 container_name (str): Represents the name of the process or docker container
         """
         parse_ip = lambda ip: ip.replace(".", "_")
-        ip = parse_ip(gethostbyname(gethostname()))
-        ret = f"{self.name}_{ip}_{gethostname()}_{pid}"
+        ip = parse_ip(socket.gethostbyname(socket.gethostname()))
+        ret = f"{self.name}_{ip}_{socket.gethostname()}_{pid}"
 
         if self.name == "ProcessMonitor" or self.name == "DockerMonitor":
-            ret = f"{self.name}_{ip}_{gethostname()}_{container_name}_{pid}"
+            ret = f"{self.name}_{ip}_{socket.gethostname()}_{container_name}_{pid}"
 
         return ret
 
@@ -100,25 +99,32 @@ class BaseMonitor(object):
 
         source_name = self.get_source_name(pid=pid, container_name=container_name)
 
-        with socket(AF_INET, SOCK_STREAM) as sock:
-            sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-            sock.connect((self.address, self.port))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
+            sockfd.connect((self.address, self.port))
             
-            print(f"Connected {source_name} collector to server", flush=True)
+            print(f"[ {source_name} ] Connected collector to server", flush=True)
 
-            signal, _ = receive(sock)
+            try:
+                signal, _ = receive(sockfd)
+            except EOFError:
+                print("Monitor died")
+                exit()
 
             if signal == START_MESSAGE:
-                print(f"Starting {self.name}", flush=True)
+                print(f"[ {source_name} ] Starting", flush=True)
 
                 while True:
                     ret = function(*function_args)
 
                     message = {"source": source_name, "data": ret}
 
-                    send_to(sock, message)
+                    try:
+                        send_to(sockfd, message)
 
-                    recv, _ = receive(sock)
+                        recv, _ = receive(sockfd)
+                    except EOFError:
+                        print(f"[ {source_name} ] Monitor died")
+                        exit()
 
     def collect(self):
         """ Method to be implemented by child classes """
