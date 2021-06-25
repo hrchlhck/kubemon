@@ -3,7 +3,7 @@ from ..collector import *
 
 import argparse
 
-SYSTEMS = ['collector', 'monitor', 'process', 'docker']
+MODULES = ['collector', 'monitor', 'process', 'docker']
 
 def get_system(sys_type, args):
     if args.host and args.port:
@@ -16,12 +16,13 @@ def get_system(sys_type, args):
         elif sys_type == 'docker':
             return DockerMonitor(address=args.host, port=int(args.port), interval=int(args.interval))
         elif sys_type == 'cli':
-            return CollectorClient(address=args.host, port=int(args.port))
+            return CollectorClient(address=args.host, port=9880)
     elif not args.host:
         print("Missing --host/-H IP")
 
-parser = argparse.ArgumentParser(description='sys-monitor commands')
+parser = argparse.ArgumentParser(description='Kubemon commands')
 
+parser.add_argument('-l', '--list', help="Lists all available modules", action='store_true')
 parser.add_argument('-t', '--type', help='Functionality of sys-monitor. E.g. collector, monitor, merge...')
 parser.add_argument('-H', '--host', default='0.0.0.0', help='Host that any of sys-monitor functions will be connecting', metavar='IP')
 parser.add_argument('-p', '--port', default=9822, help='Port of the host')

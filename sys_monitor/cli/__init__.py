@@ -1,5 +1,5 @@
 from .commands import args
 from .commands import get_system
-from .commands import SYSTEMS
+from .commands import MODULES
 
-__all__ = ["args", "get_system", "SYSTEMS"]
+__all__ = ["args", "get_system", "MODULES"]
