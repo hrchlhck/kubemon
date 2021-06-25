@@ -1,7 +1,6 @@
-from pathlib import Path
 from docker.models.containers import Container
-from typing import List, NamedTuple
-from collections import namedtuple, deque
+from typing import List
+from collections import namedtuple
 from subprocess import check_output
 import re
 import docker
@@ -26,7 +25,7 @@ def get_container_name_by_id(container_id: str):
         return ret
     else:
         raise ValueError("Object of type %s is not a container" %
-                         type(container))
+                         type(container_id))
 
 
 def parse_container_id(container_id: str):

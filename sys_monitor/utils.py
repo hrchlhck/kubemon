@@ -1,10 +1,8 @@
 from subprocess import check_output
-from functools import reduce, wraps
-from addict import Dict
+from functools import reduce
 from os.path import join, isfile
 from pathlib import Path
-from typing import List, Tuple
-from collections.abc import Callable
+from typing import List
 from requests import get
 from operator import sub
 from .constants import ROOT_DIR
@@ -137,23 +135,22 @@ def format_name(name):
     return "%s" % name.split('-')[0]
 
 
-def get_containers(client: docker.client.DockerClient, platform=sys.platform, namespace='', to_tuple=False) -> List[docker.client.ContainerCollection]:
+def get_containers(client: docker.client.DockerClient, namespace='default', to_tuple=False) -> List[docker.client.ContainerCollection]:
     """ 
     Returns a list of containers. 
         By default and for my research purpose I'm using Kubernetes, so I'm avoiding containers that
-        contains 'POD' (Assigned by Kuberenetes) and 'k8s-bigdata' (Namespace in Kubernetes that I've created) 
+        contains 'POD' (created by Kuberenetes) and 'k8s-bigdata' (Namespace in Kubernetes that I've created) 
         in their name. Furthermore I assume that this filter is only applied when the platform is Linux-based, 
         because I've created a Kubernetes cluster only in Linux-based machines, otherwise, if the platform
         is Windows or MacOS, the function will return all containers that are running.
 
     Args:
         client (DockerClient): Object returned by docker.from_env()
-        platform (str): By default, It uses sys.platform to get the current system platform
         namespace (str): Used to filter containers created by Kubernetes. If empty, it returns all containers
         to_tuple (bool): Return a list of namedtuples that represent a pair of container and container name 
     """
     containers = client.containers.list()
-    def _filter(x): return 'POD' not in x.name and namespace in x.name
+    _filter = lambda x: 'POD' not in x.name and namespace in x.name
 
     if not to_tuple:
         return list(filter(_filter, containers))
