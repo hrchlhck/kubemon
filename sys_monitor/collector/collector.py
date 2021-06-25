@@ -3,12 +3,10 @@ from ..utils import save_csv, receive, send_to
 from addict import Dict
 from datetime import datetime
 from collections import deque, namedtuple
-from sty import fg, rs, ef
+from sty import fg
 from os.path import join as join_path
 import socket
-import traceback
 import threading
-import sys
 
 # Namedtuple to represent a socket client returned by socket.accept()
 Client = namedtuple('Client', ['socket_object', 'address'])
@@ -64,9 +62,19 @@ class Collector(object):
 
             print("\t[ {}+{} ] {}:{} connected".format(fg(0, 255, 0), fg.rs, *address), flush=True)
 
-            start_thread(self.__listen_to_client, (client, address))
+            start_thread(self.__listen_monitors, (client, address))
   
     def __listen_cli(self, client: socket.socket) -> None:
+        """ 
+        Function to receive and redirect commands from a CLI to monitors. 
+        Currently it is based on UDP sockets.
+
+        Args:
+            client (socket.socket): client socket
+        
+        Returns:
+            None
+        """
         while True:
             data, addr = receive(client)
 
@@ -90,7 +98,8 @@ class Collector(object):
 
                 send_to(client, message, address=addr)
 
-    def __start_instances(self):
+    def __start_instances(self) -> None:
+        """ Utility function to start all monitor instances connected. """
         for client in self.__instances:
             send_to(client, START_MESSAGE)
             print(f"{self.__tag}Started client {client}", flush=True)
@@ -113,22 +122,41 @@ class Collector(object):
             exit(1)
         return sockfd
 
-    def __start_cli(self):
+    def __start_cli(self) -> None:
+        """ Wrapper function to setup CLI. """
+        
+        # Setup socket
         sockfd = self.__setup_socket(self.address, self.cli_port, socket.SOCK_DGRAM)
         print(f"{self.__tag}Started collector CLI at {self.address}:{self.cli_port}", flush=True)
+
+        # Start listening for commands
         self.__listen_cli(sockfd)
 
-    def __start_collector(self):
+    def __start_collector(self) -> None:
+        """ Wrapper function to setup the collector. """
+
+        # Setup socket
         sockfd = self.__setup_socket(self.address, self.port, socket.SOCK_STREAM)
         sockfd.listen()
         print(f"{self.__tag}Started collector at {self.address}:{self.port}", flush=True)
+
+        # Start accepting incoming connections from monitors
         self.__accept_connections(sockfd)
     
-    def start(self):
+    def start(self) -> None:
+        """ Start the collector """
         start_thread(self.__start_cli)
         start_thread(self.__start_collector)
 
-    def __listen_to_client(self, client: socket.socket, address: tuple) -> None:
+    def __listen_monitors(self, client: socket.socket, address: tuple) -> None:
+        """ Listen for monitors. 
+
+        Args:
+            client (socket.socket): Monitor socket
+            address (tuple): Monitor address
+        
+        Returns: None
+        """
         print("{}Creating new thread for client {}:{}".format(self.__tag, *address), flush=True)
 
         _client = Client(client, client.getsockname())
@@ -153,10 +181,11 @@ class Collector(object):
                 send_to(client, f"OK - {datetime.now()}")
 
             except:
-                # traceback.print_exc()
                 addr, port = _client.address
                 print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] Unregistered {addr}:{port}", flush=True)
                 self.mutex.acquire()
                 self.__instances.remove(client)
                 self.mutex.release()
+
+                # Killing thread
                 exit(1)
