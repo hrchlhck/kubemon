@@ -1,12 +1,12 @@
 from setuptools import setup
 
 setup(
-    name='sys_monitor',
-    version='1.0.0',
-    descripton='A Python tool for monitoring SLA in container orchestration environments',
-    url='https://github.com/hrchlhck/sys-monitor',
+    name='kubemon',
+    version='2.0.0',
+    descripton='A tool for distributed container monitoring over Kubernetes',
+    url='https://github.com/hrchlhck/kubemon',
     author='Pedro (vpemfh7) Horchulhack',
-    author_email='vpemfh7@protonmail.com',
+    author_email='pedro.horchulhack@ppgia.pucpr.br',
     license='MIT',
     install_requires=['pandas', 'requests', 'psutil', 'docker', 'addict', 'sty']
 )

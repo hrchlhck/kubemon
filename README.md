@@ -43,7 +43,7 @@ A tool for distributed container monitoring over Kubernetes.
     ```
 2. Install packages
     ```sh 
-    (venv) $ python setup.py install . 
+    (venv) $ pip install .
     ```
 
 ## Running
@@ -51,12 +51,13 @@ In the further subsections will be teaching how to execute this tool.
 
 A brief command list:
 ```sh
-usage: main.py [-h] [-t TYPE] [-H IP] [-p PORT] [-f FILE1 FILE2] [-c [COMMAND ...]] [-i INTERVAL]
+usage: kubemon.py [-h] [-l] [-t TYPE] [-H IP] [-p PORT] [-f FILE1 FILE2] [-c [COMMAND ...]] [-i INTERVAL]
 
-sys-monitor commands
+Kubemon commands
 
 optional arguments:
   -h, --help            show this help message and exit
+  -l, --list            Lists all available modules
   -t TYPE, --type TYPE  Functionality of sys-monitor. E.g. collector, monitor, merge...
   -H IP, --host IP      Host that any of sys-monitor functions will be connecting
   -p PORT, --port PORT  Port of the host
@@ -95,7 +96,7 @@ There are two commands available so far:
 1. ```/instances``` - Number of monitor instances connected to the ```collector``` object.
 2. ```/start <output_dir>``` - Start the monitors and setting up the output directory to save the files
 ```sh
-(venv) $ python main.py -t cli -p 192.168.0.3 -p 9880 -c "/instances"
+(venv) $ python main.py -t cli -p 192.168.0.3 -c /instances
 Connected instances: 0
 ```
 ## References
