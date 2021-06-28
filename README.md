@@ -85,7 +85,7 @@ There are three types of monitors:
 2. DockerMonitor - Collects Docker metrics
 3. ProcessMonitor - Collects container processes metrics
 
-**The tool must be executed as ```sudo``` because some metrics (e.g. ntwork, disk, ...) are available only for super users.**
+**The tool must be executed as ```sudo``` because some metrics (e.g. network, disk, ...) are available only for super users.**
 
 In this case, let's run all the monitors at once:
 ```sh
