@@ -29,6 +29,8 @@ A tool for distributed container monitoring over Kubernetes.
 - [virtualenv](https://github.com/pypa/virtualenv)
 
 ## Illustrations
+Basic diagram
+![Kubemon diagram](./assets/diagram.svg)
 
 ## Main functionalities
 - Collects metrics from operating system, Docker containers and processes created by the container
@@ -83,9 +85,11 @@ There are three types of monitors:
 2. DockerMonitor - Collects Docker metrics
 3. ProcessMonitor - Collects container processes metrics
 
+**The tool must be executed as ```sudo``` because some metrics (e.g. ntwork, disk, ...) are available only for super users.**
+
 In this case, let's run all the monitors at once:
 ```sh
-(venv) $ python main.py -t all -H 192.168.0.3
+(venv) $ sudo python main.py -t all -H 192.168.0.3
 Connected OSMonitor_192_168_0_3_node_0 monitor to collector
 ...
 ```
