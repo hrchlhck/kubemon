@@ -37,21 +37,39 @@ Basic diagram
 
 ## Main functionalities
 - Collects metrics from operating system, Docker containers and processes created by the container
-- Send the collected metrics to the ```collector``` object, which saves the data in a CSV file
-- Can be controlled by a basic CLI
+- Send the collected metrics to the ```collector``` module, which saves the data in a CSV file
+- Can be controlled remotely by a basic CLI
 
 ## Installation
-1. Create a virtual environment and activate it
+Before installing the tool, make sure Kubernetes and Docker are properly installed in the system. Besides, the tool must be downloaded and extracted in each Kubernetes node to properly monitor the metrics of the cluster.
+
+1. Download the latest version here: [kubemon v2.0.0](https://github.com/hrchlhck/kubemon/archive/refs/tags/v2.0.0.zip) 
+
+2. Extract the zip file and go on the extracted directory
+
+3. Create a virtual environment and activate it
     ```sh
     $ python3 -m venv venv 
     $ source venv/bin/activate
     ```
-2. Install packages
+
+4. Install packages
     ```sh 
     (venv) $ pip install .
     ```
 
 ## Running
+The collected metrics will be saved in the ```client``` machine (See [Client](#Illustrations) in the diagram) by default in ```/tmp/data```. This setting can be changed in ```./kubemon/constants.py``` by changing ```ROOT_DIR``` variable value.
+
+Example: 
+```python
+# Before
+ROOT_DIR = "/tmp/data"
+
+# After
+ROOT_DIR = "/home/user/Documents/data"
+```
+
 In the further subsections will be teaching how to execute this tool.
 
 A brief command list:
@@ -90,22 +108,32 @@ There are three types of monitors:
 
 **The tool must be executed as ```sudo``` because some metrics (e.g. network, disk, ...) are available only for super users.**
 
-In this case, let's run all the monitors at once:
+### In this case, let's run all the monitors at once:
 ```sh
 (venv) $ sudo python main.py -t all -H 192.168.0.3
 Connected OSMonitor_192_168_0_3_node_0 monitor to collector
 ...
 ```
+
 ### CLI
 Assuming the same IP address for the collector in the section [Monitor](#monitor), the port to communicate with the ```collector``` via CLI is ```9880```.
 
 There are two commands available so far:
 1. ```/instances``` - Number of monitor instances connected to the ```collector``` object.
 2. ```/start <output_dir>``` - Start the monitors and setting up the output directory to save the files
+
+### Checking how many instances are connected
 ```sh
-(venv) $ python main.py -t cli -p 192.168.0.3 -c /instances
-Connected instances: 0
+(venv) $ python main.py -t cli -H 192.168.0.3 -c /instances
+Connected instances: 5
 ```
+
+### Starting monitors. In this case the CSV files will be saved at ```/tmp/data/test00/```
+```sh
+(venv) $ python main.py -t cli -H 192.168.0.3 -c /start "test00"
+Started 5 monitors
+```
+
 ## References
 - [Block layer statistics](https://www.kernel.org/doc/html/latest/block/stat.html)
 - [/proc virtual file system](https://man7.org/linux/man-pages/man5/proc.5.html)

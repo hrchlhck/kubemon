@@ -2,8 +2,8 @@
 Uma ferramenta para monitoramento de containers distribuídos no Kubernetes.
 
 ## Sumário
-- [Dependências de Ambiente](#dependencias-de-ambiente)
-- [Dependências de Aplicação](#dependencias-de-aplicaçao)
+- [Dependências de Ambiente](#dependências-de-ambiente)
+- [Dependências de Aplicação](#dependências-de-aplicação)
 - [Diagramas](#diagramas)
 - [Principais Funcionalidades](#principais-funcionalidades)
 - [Instalação](#instalaçao)
@@ -38,26 +38,43 @@ Diagrama simples da ferramenta.
 - Pode ser controlada remotamente por uma CLI básica
 
 ## Instalação
-1. Crie um ambiente virtual do Python e ative-o
+Antes de instalar a ferramenta, verifique se o Kubernetes e o Docker estão propriamente instalados no sistema. Além disso, a ferramenta deve ser baixada e extraída em todos os nós do cluster do Kubernetes para monitorar as métricas.
+
+1. Baixe a última versão da ferramenta no link: [kubemon v2.0.0](https://github.com/hrchlhck/kubemon/archive/refs/tags/v2.0.0.zip) 
+
+2. Extraia os arquivos do zip e entre no diretório
+
+3. Crie um ambiente virtual do Python e ative-o
     ```sh
     $ python3 -m venv venv 
     $ source venv/bin/activate
     ```
-2. Instale as dependências
+4. Instale as dependências
     ```sh 
     (venv) $ pip install .
     ```
 
-## Running
+## Executando
+As métricas coletadas serão salvas na máquina do ```cliente``` (Veja [Cliente](#diagrama) no diagrama) por padrão no diretório ```/tmp/data```. Essa configuração pode ser alterada no arquivo ```./kubemon/constants.py``` trocando o valor da variável ```ROOT_DIR```.
+
+Exemplo: 
+```python
+# Antes
+ROOT_DIR = "/tmp/data"
+
+# Depois
+ROOT_DIR = "/home/user/Documents/data"
+```
+
 Nas próximas seções será abordado como executar cada módulo da ferramenta.
 
 Lista de comandos disponíveis:
 ```sh
 usage: kubemon.py [-h] [-l] [-t TYPE] [-H IP] [-p PORT] [-f FILE1 FILE2] [-c [COMMAND ...]] [-i INTERVAL]
 
-Kubemon commands
+Comandos do Kubemon 
 
-optional arguments:
+Comandos opcionais:
   -h, --help            show this help message and exit
   -l, --list            Lista os módulos existentes
   -t TYPE, --type TYPE  Funcionalidade do Kubemon. E.g. collector, monitor, docker...
@@ -94,16 +111,26 @@ Neste caso, para executar os três monitores:
 Connected OSMonitor_192_168_0_3_node_0 monitor to collector
 ...
 ```
+
 ### CLI
 Assumindo o mesmo IP na seção [Monitor](#monitor), a porta para comunicação com o ```collector``` via CLI é ```9880```.
 
 Até o momento existem os comandos:
 1. ```/instances``` - Quantidade de instâncias ```monitor``` conectadas ao módulo ```collector```.
 2. ```/start <output_dir>``` - Inicia a coleta de métricas e salva no diretório ```output_dir``` definido pelo usuário.
+
+### Checando quantas instâncias ```monitor``` estão conectadas
 ```sh
-(venv) $ python main.py -t cli -p 192.168.0.3 -c /instances
-Connected instances: 0
+(venv) $ python main.py -t cli -H 192.168.0.3 -c /instances
+Connected instances: 5
 ```
+
+### Iniciando os monitores. Neste caso, os arquivos CSV serão salvos no caminho ```/tmp/data/test00/```
+```sh
+(venv) $ python main.py -t cli -H 192.168.0.3 -c /start "test00"
+Started 5 monitors
+```
+
 ## Referências
 - [Block layer statistics](https://www.kernel.org/doc/html/latest/block/stat.html)
 - [/proc virtual file system](https://man7.org/linux/man-pages/man5/proc.5.html)
