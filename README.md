@@ -1,6 +1,9 @@
 # kubemon
 A tool for distributed container monitoring over Kubernetes.
 
+## Translations
+- [Português](./assets/README-pt-br.md)
+
 ## Table of contents
 - [Environment requirements](#environment-requirements)
 - [Application requirements](#application-requirements)
@@ -30,7 +33,7 @@ A tool for distributed container monitoring over Kubernetes.
 
 ## Illustrations
 Basic diagram
-![Kubemon diagram](./assets/diagram.svg)
+![Kubemon diagram](./assets/diagram-en.svg)
 
 ## Main functionalities
 - Collects metrics from operating system, Docker containers and processes created by the container
