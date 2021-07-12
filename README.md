@@ -74,7 +74,7 @@ In the further subsections will be teaching how to execute this tool.
 
 A brief command list:
 ```sh
-usage: kubemon.py [-h] [-l] [-t TYPE] [-H IP] [-p PORT] [-f FILE1 FILE2] [-c [COMMAND ...]] [-i INTERVAL]
+usage: kubemon [-h] [-l] [-t TYPE] [-H IP] [-p PORT] [-f FILE1 FILE2] [-c [COMMAND ...]] [-i INTERVAL]
 
 Kubemon commands
 
@@ -110,7 +110,7 @@ There are three types of monitors:
 
 ### In this case, let's run all the monitors at once:
 ```sh
-(venv) $ sudo python main.py -t all -H 192.168.0.3
+(venv) $ sudo python -m kubemon -t all -H 192.168.0.3
 Connected OSMonitor_192_168_0_3_node_0 monitor to collector
 ...
 ```
@@ -124,13 +124,13 @@ There are two commands available so far:
 
 ### Checking how many instances are connected
 ```sh
-(venv) $ python main.py -t cli -H 192.168.0.3 -c /instances
+(venv) $ python -m kubemon -t cli -H 192.168.0.3 -c /instances
 Connected instances: 5
 ```
 
 ### Starting monitors. In this case the CSV files will be saved at ```/tmp/data/test00/```
 ```sh
-(venv) $ python main.py -t cli -H 192.168.0.3 -c /start "test00"
+(venv) $ python -m kubemon -t cli -H 192.168.0.3 -c /start "test00"
 Started 5 monitors
 ```
 
