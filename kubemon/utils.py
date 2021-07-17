@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 from requests import get
 from operator import sub
-from .constants import ROOT_DIR
+from .config import ROOT_DIR
 from .decorators import wrap_exceptions
 from time import sleep
 from collections import namedtuple
@@ -208,3 +208,25 @@ def send_to(_socket: socket.socket, data: object, address=tuple()) -> None:
         _socket.sendto(pickle.dumps(data), address)
     else:
         _socket.send(pickle.dumps(data))
+
+def get_default_nic():
+    """ Function to get the default network interface in a Linux-based system. """
+    # Source: https://stackoverflow.com/a/20925510/12238188
+
+    route = '/proc/net/route'
+    with open(route, mode='r') as fd:
+        # Removing spaces and separating fields
+        lines = list(map(lambda x: x.strip().split(), fd))
+        
+        # Removing header
+        lines.pop(0)
+
+        # Parsing nic
+        for iface in lines:
+            name = iface[0]
+            dest = iface[1]
+            flags = iface[3]
+
+            if dest != '00000000' or not int(flags, 16) & 2:
+                continue
+            return name

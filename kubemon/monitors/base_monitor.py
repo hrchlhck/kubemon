@@ -1,6 +1,6 @@
 from ..utils import get_containers, get_container_pid, receive, send_to, filter_dict
 from ..decorators import wrap_exceptions
-from ..constants import START_MESSAGE
+from ..config import START_MESSAGE
 from typing import Callable
 from threading import Thread
 import socket
