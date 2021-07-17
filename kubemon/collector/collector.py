@@ -1,4 +1,4 @@
-from ..config import START_MESSAGE
+from ..config import START_MESSAGE, DEFAULT_CLI_PORT
 from ..utils import save_csv, receive, send_to
 from addict import Dict
 from datetime import datetime
@@ -23,7 +23,7 @@ def start_thread(func, args=tuple()):
 
 
 class Collector(object):
-    def __init__(self, address: str, port: int, cli_port=9880):
+    def __init__(self, address: str, port: int, cli_port=DEFAULT_CLI_PORT):
         self.__address = address
         self.__port = port
         self.__cli_port = cli_port

@@ -1,6 +1,6 @@
 from ..utils import get_containers, get_container_pid, receive, send_to, filter_dict
 from ..decorators import wrap_exceptions
-from ..config import START_MESSAGE
+from ..config import START_MESSAGE, DEFAULT_MONITOR_INTERVAL
 from typing import Callable
 from threading import Thread
 import socket
@@ -9,7 +9,7 @@ import os
 
 
 class BaseMonitor(object):
-    def __init__(self, address, port, interval=5):
+    def __init__(self, address, port, interval=DEFAULT_MONITOR_INTERVAL):
         self.__address = address
         self.__port = port
         self.__interval = interval
