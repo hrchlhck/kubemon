@@ -17,3 +17,6 @@ DEFAULT_MONITOR_INTERVAL = 5
 
 # CLI configuration
 DEFAULT_CLI_PORT = 9880
+
+# Disk configuration
+DEFAULT_DISK_PARTITION = 'sda'
