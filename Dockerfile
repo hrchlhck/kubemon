@@ -6,9 +6,7 @@ STOPSIGNAL SIGINT
 
 ADD setup.py .
 ADD kubemon/ kubemon/
-ADD kubemon.py .
 
-RUN pip install . \
-    && chmod +x kubemon.py
+RUN pip install . 
 
-ENTRYPOINT ["python3", "kubemon.py"]
+ENTRYPOINT ["python3", "-m", "kubemon"]
