@@ -135,7 +135,7 @@ def format_name(name):
     return "%s" % name.split('-')[0]
 
 
-def get_containers(client: docker.client.DockerClient, namespace='default', to_tuple=False) -> List[docker.client.ContainerCollection]:
+def get_containers(client: docker.client.DockerClient, namespace='', to_tuple=False) -> List[docker.client.ContainerCollection]:
     """ 
     Returns a list of containers. 
         By default and for my research purpose I'm using Kubernetes, so I'm avoiding containers that
@@ -146,11 +146,12 @@ def get_containers(client: docker.client.DockerClient, namespace='default', to_t
 
     Args:
         client (DockerClient): Object returned by docker.from_env()
-        namespace (str): Used to filter containers created by Kubernetes. If empty, it returns all containers
+        namespace (str): Used to filter containers created by Kubernetes. If empty, it returns all containers 
+        except from 'kube-system' namespace
         to_tuple (bool): Return a list of namedtuples that represent a pair of container and container name 
     """
     containers = client.containers.list()
-    _filter = lambda x: 'POD' not in x.name and namespace in x.name
+    _filter = lambda x: 'POD' not in x.name and namespace in x.name and 'kube-system' not in x.name
 
     if not to_tuple:
         return list(filter(_filter, containers))
