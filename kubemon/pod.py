@@ -69,7 +69,7 @@ class Pod:
             qos (str): QoS class from Kubernetes
         
         """
-        return f"/sys/fs/cgroup/{controller}/kubepods/{qos}/pod{self.id}"
+        return f"/sys/fs/cgroup/{controller}/kubepods.slice/kubepods-{qos}.slice/kubepods-{qos}-pod{self.id}"
 
     def __repr__(self):
         return "Pod<Name=%s, id=%s, containers=%s>" % (self.name, self.id, self.containers)
@@ -87,7 +87,7 @@ class Pod:
         """
         pattern = r"([a-f-0-9]){8}-([a-f-0-9]){4}-([a-f-0-9]){4}-([a-f-0-9]){4}-([a-f-0-9]){12}"
         pod_id = re.search(pattern, container_name).group()
-        return Pod(container_name, uid=pod_id)
+        return Pod(container_name, uid=pod_id.replace('-', '_'))
 
     @staticmethod
     def list_pods(namespace="default", controller='systemd', qos="besteffort") -> list:
@@ -101,8 +101,6 @@ class Pod:
         """
         if sys.platform.startswith("win"):
             raise OSError("Current operating system not supported")
-
-        path = f"/sys/fs/cgroup/{controller}/kubepods/{qos}/"
 
         client = docker.from_env()
 
@@ -128,7 +126,7 @@ class Pod:
         
         # Filter pod container from cgroups dir
         for pod in pods:           
-            filtered_containers = [c for c in containers if c.id in os.listdir(pod.path(controller, qos=qos))]
+            filtered_containers = [c for c in containers if f'docker-{c.id}.scope' in os.listdir(pod.path(controller, qos=qos))]
 
             pod.containers = filtered_containers
 

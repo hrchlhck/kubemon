@@ -1,9 +1,9 @@
+from kubemon.config import DEFAULT_DISK_PARTITION
 from ..utils import subtract_dicts, filter_dict, get_container_pid
 from .base_monitor import BaseMonitor
-from .process_monitor import parse_proc_net, ProcessMonitor
+from .process_monitor import ProcessMonitor
 from ..entities.disk import Disk
 from ..pod import *
-from threading import Thread
 from time import sleep
 from typing import List
 
@@ -36,7 +36,7 @@ class DockerMonitor(BaseMonitor):
             _alt_path (str): Alternative path to be gathering data
         """
         if pod and container:
-            ret = f"{self.stats_path}/{cgroup_controller}/kubepods/besteffort/pod{pod.id}/{container.id}/{cgroup_controller}.{stat}"
+            ret = f"{self.stats_path}/{cgroup_controller}/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod{pod.id}.slice/docker-{container.id}.scope/{cgroup_controller}.{stat}"
         elif container and not pod: 
             ret = f"{self.stats_path}/{cgroup_controller}/system.slice/docker-{container.id}.scope/{cgroup_controller}.{stat}"
         else:
@@ -151,7 +151,7 @@ class DockerMonitor(BaseMonitor):
         
         return ret
 
-    def get_stats(self, container: Pair, pod: Pod=None, disk_name="sdb") -> dict:
+    def get_stats(self, container: Pair, pod: Pod=None, disk_name=DEFAULT_DISK_PARTITION) -> dict:
         """ 
         Get all metrics of a given container within a pod 
 
