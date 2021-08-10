@@ -6,4 +6,4 @@ HOST=$1
 source venv/bin/activate
 
 # Start monitors
-sudo nohup $(pwd)venv/bin/python -m kubemon -t all -H $HOST 2>&1 &
+sudo nohup $(pwd)/venv/bin/python -m kubemon -t all -H $HOST 2>&1 &
