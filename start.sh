@@ -1,9 +1,14 @@
 #!/bin/bash
 
+BASE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST=$1
+
+cd $BASE_DIR
 
 # Activate venv
 source venv/bin/activate
 
 # Start monitors
-sudo nohup $(pwd)/venv/bin/python -m kubemon -t all -H $HOST 2>&1 &
+nohup python -m kubemon -t all -H $HOST > /dev/null 2>&1 &
+
+cd -
