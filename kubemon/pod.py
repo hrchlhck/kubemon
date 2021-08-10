@@ -69,7 +69,7 @@ class Pod:
             qos (str): QoS class from Kubernetes
         
         """
-        return f"/sys/fs/cgroup/{controller}/kubepods.slice/kubepods-{qos}.slice/kubepods-{qos}-pod{self.id}"
+        return f"/sys/fs/cgroup/{controller}/kubepods.slice/kubepods-{qos}.slice/kubepods-{qos}-pod{self.id}.slice"
 
     def __repr__(self):
         return "Pod<Name=%s, id=%s, containers=%s>" % (self.name, self.id, self.containers)
