@@ -2,14 +2,18 @@ from ..config import START_MESSAGE, DEFAULT_CLI_PORT
 from ..utils import save_csv, receive, send_to
 from addict import Dict
 from datetime import datetime
-from collections import deque, namedtuple
 from sty import fg
 from os.path import join as join_path
 import socket
 import threading
+import dataclasses
 
-# Namedtuple to represent a socket client returned by socket.accept()
-Client = namedtuple('Client', ['socket_object', 'address'])
+@dataclasses.dataclass
+class Client:
+    """ Dataclass to represent a socket client returned by socket.accept() """
+    name: str
+    socket_obj: socket.socket
+    address: tuple
 
 def start_thread(func, args=tuple()):
     """
@@ -28,7 +32,7 @@ class Collector(object):
         self.__port = port
         self.__cli_port = cli_port
         self.__mutex = threading.Lock()
-        self.__instances = deque()
+        self.__instances = list()
         self.__tag = f"[ {fg(255, 200, 100)}{self.__class__.__name__}{fg.rs} ] "
         self.dir_name = None
 
@@ -56,13 +60,17 @@ class Collector(object):
         while True:
             client, address = sockfd.accept()
 
+            # Receiving the monitor name
+            name, _ = receive(client, buffer_size=512)
+            client = Client(name, client, client.getsockname())
+
             self.mutex.acquire()
             self.__instances.append(client)
             self.mutex.release()
 
-            print("\t[ {}+{} ] {}:{} connected".format(fg(0, 255, 0), fg.rs, *address), flush=True)
+            print("\t[ {}+{} ] {}@{}:{} connected".format(fg(0, 255, 0), fg.rs, name, *address), flush=True)
 
-            start_thread(self.__listen_monitors, (client, address))
+            start_thread(self.__listen_monitors, (client,))
   
     def __listen_cli(self, client: socket.socket) -> None:
         """ 
@@ -101,8 +109,8 @@ class Collector(object):
     def __start_instances(self) -> None:
         """ Utility function to start all monitor instances connected. """
         for client in self.__instances:
-            send_to(client, START_MESSAGE)
-            print(f"{self.__tag}Started client {client}", flush=True)
+            send_to(client.socket_obj, START_MESSAGE)
+            print(f"{self.__tag}Started client {client.name}", flush=True)
 
     def __setup_socket(self, address: str, port: int, socktype: socket.SocketKind) -> socket.socket:
         """ 
@@ -148,7 +156,7 @@ class Collector(object):
         start_thread(self.__start_cli)
         start_thread(self.__start_collector)
 
-    def __listen_monitors(self, client: socket.socket, address: tuple) -> None:
+    def __listen_monitors(self, client: Client) -> None:
         """ Listen for monitors. 
 
         Args:
@@ -157,15 +165,16 @@ class Collector(object):
         
         Returns: None
         """
-        print("{}Creating new thread for client {}:{}".format(self.__tag, *address), flush=True)
-
-        _client = Client(client, client.getsockname())
+        print("{}Creating new thread for client {}@{}:{}".format(self.__tag, client.name, *client.address), flush=True)
 
         while True:
             try:
-                data, _ = receive(client, buffer_size=2048)
+                data, _ = receive(client.socket_obj, buffer_size=2048)
 
-                print("{}Received {} from {}:{}".format(self.__tag, data, *address), flush=True)
+                if data != None:
+                    print(f"{self.__tag}Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}", flush=True)
+                else:
+                    print(f"{self.__tag}Received nothing from ")
 
                 if isinstance(data, dict):
                     data = Dict(data)
@@ -178,11 +187,11 @@ class Collector(object):
                     
                     save_csv(data.data, data.source, dir_name=dir_name)
 
-                send_to(client, f"OK - {datetime.now()}")
+                send_to(client.socket_obj, f"OK - {datetime.now()}")
 
             except:
-                addr, port = _client.address
-                print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] Unregistered {addr}:{port}", flush=True)
+                addr, port = client.address
+                print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] Unregistered {client.name} {addr}:{port}", flush=True)
                 self.mutex.acquire()
                 self.__instances.remove(client)
                 self.mutex.release()

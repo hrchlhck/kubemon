@@ -101,8 +101,10 @@ class BaseMonitor(object):
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
             sockfd.connect((self.address, self.port))
-            
+
             print(f"[ {source_name} ] Connected collector to server", flush=True)
+
+            send_to(sockfd, source_name)
 
             try:
                 signal, _ = receive(sockfd)
