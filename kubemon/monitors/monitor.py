@@ -4,6 +4,7 @@ from ..entities.cpu import CPU
 from ..entities.disk import Disk
 from ..entities.network import Network
 from ..utils import subtract_dicts
+import time
 
 
 class OSMonitor(BaseMonitor):
@@ -26,6 +27,8 @@ class OSMonitor(BaseMonitor):
 
     def collect(self):
         data = self.__get_data()
+
+        time.sleep(self.interval)
 
         data_new = self.__get_data()
 
