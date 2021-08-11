@@ -7,8 +7,8 @@ from requests import get
 from operator import sub
 from .config import ROOT_DIR
 from .decorators import wrap_exceptions
+from .dataclasses import Pair
 from time import sleep
-from collections import namedtuple
 import docker
 import socket
 import csv
@@ -17,9 +17,6 @@ import pickle
 
 __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data',
            'save_csv', 'format_name', 'get_containers', 'get_container_pid', 'try_connect', 'receive', 'send_to']
-
-# Represents a pair for a container
-Pair = namedtuple('Pair', ['container', 'name'])
 
 
 def subtract_dicts(dict1: dict, dict2: dict) -> dict:
