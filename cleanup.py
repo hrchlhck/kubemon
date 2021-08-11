@@ -1,4 +1,4 @@
-from kubemon.constants import BASE_DIR
+from kubemon.config import BASE_DIR
 import shutil
 import os
 
