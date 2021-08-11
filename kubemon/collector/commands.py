@@ -5,11 +5,19 @@ from kubemon.config import ROOT_DIR, START_MESSAGE
 import dataclasses
 import abc
 
-__all__ = ['StartCommand', 'InstancesCommand', 'NotExistCommand', 'Command', 'COMMANDS']
+__all__ = [
+    'Command', 
+    'COMMANDS'
+    'NotExistCommand', 
+    'StartCommand', 
+    'InstancesCommand', 
+    'ConnectedMonitorsCommand', 
+]
 
 COMMANDS = {
     'StartCommand': '/start <output_dir>', 
     'InstancesCommand': '/instances',
+    'ConnectedMonitorsCommand': '/monitors',
 }
 
 @dataclasses.dataclass
@@ -46,6 +54,24 @@ class InstancesCommand(Command):
         message += f"\t- OSMonitor instances: {len(os)}\n"
         message += f"\t- DockerMonitor instances: {len(docker)}\n"
         message += f"\t- ProcessMonitor instances: {len(process)}\n"
+        return message
+
+class ConnectedMonitorsCommand(Command):
+    def __init__(self, instances: List[Client]):
+        self._instances = instances
+    
+    def execute(self) -> str:
+        # Filtering only OSMonitor instances
+        os = list(filter(lambda x: x.name.startswith('OSMonitor'), self._instances))
+
+        # Parsing hostname and IP address
+        os = list(map(lambda x: f"Hostname: {x.name.split('_')[5]}\tIP: {'.'.join(i for i in x.name.split('_')[1:5])}", os))
+
+        message = f"Total OSMonitor instances: {len(os)}\n"
+        
+        if len(os):
+            for monitor in os:
+                message += "- " + monitor + "\n"
         return message
 
 class NotExistCommand(Command):

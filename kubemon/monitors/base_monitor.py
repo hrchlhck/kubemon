@@ -1,4 +1,4 @@
-from ..utils import get_containers, get_container_pid, receive, send_to, filter_dict
+from ..utils import get_containers, get_container_pid, get_host_ip, receive, send_to, filter_dict
 from ..decorators import wrap_exceptions
 from ..config import START_MESSAGE, DEFAULT_MONITOR_INTERVAL
 from typing import Callable
@@ -77,7 +77,7 @@ class BaseMonitor(object):
                 container_name (str): Represents the name of the process or docker container
         """
         parse_ip = lambda ip: ip.replace(".", "_")
-        ip = parse_ip(socket.gethostbyname(socket.gethostname()))
+        ip = parse_ip(get_host_ip())
         ret = f"{self.name}_{ip}_{socket.gethostname()}_{pid}"
 
         if self.name == "ProcessMonitor" or self.name == "DockerMonitor":

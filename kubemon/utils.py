@@ -228,3 +228,10 @@ def get_default_nic():
             if dest != '00000000' or not int(flags, 16) & 2:
                 continue
             return name
+
+def get_host_ip():
+    """ Returns the actual IPaddress from the host """
+    # Source:https://stackoverflow.com/a/30990617/12238188 
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+        sockfd.connect(('8.8.8.8', 80))
+        return sockfd.getsockname()[0]

@@ -1,4 +1,4 @@
-from kubemon.collector.commands import InstancesCommand, NotExistCommand, StartCommand
+from kubemon.collector.commands import ConnectedMonitorsCommand, InstancesCommand, NotExistCommand, StartCommand
 from ..dataclasses import Client
 from ..config import DEFAULT_CLI_PORT
 from ..utils import save_csv, receive, send_to
@@ -90,7 +90,9 @@ class Collector(object):
                         self.dir_name = data[1]
                     command = StartCommand(self.__instances, self.dir_name, self.address)
                 elif cmd == "/instances":
-                    command = InstancesCommand(self.__instances)         
+                    command = InstancesCommand(self.__instances)
+                elif cmd == "/monitors":
+                    command = ConnectedMonitorsCommand(self.__instances)
                 else:
                     command = NotExistCommand()           
 
