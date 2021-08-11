@@ -1,4 +1,6 @@
-from ..config import START_MESSAGE, DEFAULT_CLI_PORT
+from kubemon.collector.commands import InstancesCommand, NotExistCommand, StartCommand
+from ..dataclasses import Client
+from ..config import DEFAULT_CLI_PORT
 from ..utils import save_csv, receive, send_to
 from addict import Dict
 from datetime import datetime
@@ -6,14 +8,6 @@ from sty import fg
 from os.path import join as join_path
 import socket
 import threading
-import dataclasses
-
-@dataclasses.dataclass
-class Client:
-    """ Dataclass to represent a socket client returned by socket.accept() """
-    name: str
-    socket_obj: socket.socket
-    address: tuple
 
 def start_thread(func, args=tuple()):
     """
@@ -72,19 +66,19 @@ class Collector(object):
 
             start_thread(self.__listen_monitors, (client,))
   
-    def __listen_cli(self, client: socket.socket) -> None:
+    def __listen_cli(self, cli: socket.socket) -> None:
         """ 
         Function to receive and redirect commands from a CLI to monitors. 
         Currently it is based on UDP sockets.
 
         Args:
-            client (socket.socket): client socket
+            cli (socket.socket): client socket
         
         Returns:
             None
         """
         while True:
-            data, addr = receive(client)
+            data, addr = receive(cli)
 
             print("\t[ {}*{} ] Command '{}' received from {}:{}".format(fg(0, 90, 255), fg.rs, data, *addr), flush=True)
 
@@ -94,23 +88,14 @@ class Collector(object):
                 if cmd == "/start":
                     if len(data) == 2:
                         self.dir_name = data[1]
-                    if self.connected_instances == 0:
-                        message = f"There are no connected monitors to be started"
-                    else:
-                        message = f"Starting {self.connected_instances} monitors"
-                        self.__start_instances()
+                    command = StartCommand(self.__instances, self.dir_name, self.address)
                 elif cmd == "/instances":
-                    message = f"Connected instances: {self.connected_instances}"
+                    command = InstancesCommand(self.__instances)         
                 else:
-                    message = "Command does not exist"
+                    command = NotExistCommand()           
 
-                send_to(client, message, address=addr)
-
-    def __start_instances(self) -> None:
-        """ Utility function to start all monitor instances connected. """
-        for client in self.__instances:
-            send_to(client.socket_obj, START_MESSAGE)
-            print(f"{self.__tag}Started client {client.name}", flush=True)
+                message = command.execute()
+                send_to(cli, message, address=addr)
 
     def __setup_socket(self, address: str, port: int, socktype: socket.SocketKind) -> socket.socket:
         """ 

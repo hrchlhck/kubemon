@@ -24,6 +24,7 @@ def get_system(sys_type, args):
 parser = argparse.ArgumentParser(description='Kubemon commands')
 
 parser.add_argument('-l', '--list', help="Lists all available modules", action='store_true')
+parser.add_argument('-lc', '--list-commands', help='List all available commands for CollectorClient', action='store_true')
 parser.add_argument('-t', '--type', help='Functionality of sys-monitor. E.g. collector, monitor, merge...')
 parser.add_argument('-H', '--host', default='0.0.0.0', help='Host that any of sys-monitor functions will be connecting', metavar='IP')
 parser.add_argument('-p', '--port', default=DEFAULT_MONITOR_PORT, help='Port of the host')

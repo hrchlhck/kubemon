@@ -1,5 +1,6 @@
 from .cli import *
 from .merge import merge
+from .collector.commands import COMMANDS
 from multiprocessing import Process
 
 def start(instance):
@@ -27,3 +28,8 @@ if __name__ == "__main__":
         print("Available modules:")
         for module in MODULES:
             print(f"\t- {module.capitalize()}")
+    
+    if args.list_commands:
+        print("Available commands:")
+        for cmd in COMMANDS:
+            print(f"- {COMMANDS[cmd]}")

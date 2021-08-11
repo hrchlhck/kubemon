@@ -20,8 +20,9 @@ class CollectorClient(object):
     def exec(self, cmd):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             send_to(sockfd, cmd, (self.address, self.port))
-            data, addr = receive(sockfd)
+            data, _ = receive(sockfd)
             print(data)
+            return data
 
     def start(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
@@ -35,5 +36,5 @@ class CollectorClient(object):
 
                 send_to(sockfd, cmd, (self.address, self.port))
 
-                data, addr = receive(sockfd)
+                data, _ = receive(sockfd)
                 print(data)
