@@ -1,17 +1,10 @@
-ifeq ($(OS),Windows_NT)
-	ROOT_DIR:=$(shell cd)
-else
-	ROOT_DIR:=$(shell pwd)
-endif
+all: clean build
 
-
-all: clean build_docker
-
-build_docker:
+build:
 	docker build -t vpemfh7/kubemon:latest .
 
 clean:
-	venv/bin/python cleanup.py
+	rm -rf $(shell find . -name __pycache__)
 
 collector:
 	@clear
