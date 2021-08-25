@@ -1,4 +1,4 @@
-from ..exceptions.platform_exception import NetworkInterfaceException
+from kubemon.utils import get_default_nic
 from .base_entity import BaseEntity
 from psutil import net_io_counters as _net
 
@@ -11,7 +11,7 @@ class Network(BaseEntity):
         return self.__get_net_usage()
 
     def __get_net_usage(self):
-        n = _net()
+        n = _net(pernic=True)[get_default_nic()]
         ret = {
             "bytes_sent": n.bytes_sent,
             "bytes_recv": n.bytes_recv,
