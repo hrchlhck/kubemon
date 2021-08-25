@@ -1,12 +1,13 @@
 from pathlib import Path
-import sys
 
 # Directories
-BASE_DIR = Path(__file__).parent.parent
-if 'win' in sys.platform:
-    ROOT_DIR = BASE_DIR
-else:
-    ROOT_DIR = "/tmp/data"
+DATA_DIR = Path("/tmp/kubemon")
+
+## Logger path
+LOG_PATH = DATA_DIR / 'logs'
+
+## Data path
+DATA_PATH = DATA_DIR / 'data'
 
 # Starting message
 START_MESSAGE = "OK"
@@ -20,3 +21,15 @@ DEFAULT_CLI_PORT = 9880
 
 # Disk configuration
 DEFAULT_DISK_PARTITION = 'sda'
+
+# Creating base directory
+if not DATA_DIR.exists():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Creating log directory
+if not LOG_PATH.exists():
+    LOG_PATH.mkdir(parents=True, exist_ok=True)
+
+# Creating data directory
+if not DATA_PATH.exists():
+    DATA_PATH.mkdir(parents=True, exist_ok=True)

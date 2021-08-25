@@ -2,6 +2,7 @@ from docker.models.containers import Container
 from typing import List
 from collections import namedtuple
 from subprocess import check_output
+from .log import create_logger
 import re
 import docker
 import os
@@ -11,6 +12,7 @@ __all__ = ['Pod', 'Pair']
 
 Pair = namedtuple('Pair', ['name', 'id'])
 
+LOGGER = create_logger(__name__)
 
 def get_container_name_by_id(container_id: str):
     """ Get container name by an given id. """
@@ -69,7 +71,9 @@ class Pod:
             qos (str): QoS class from Kubernetes
         
         """
-        return f"/sys/fs/cgroup/{controller}/kubepods.slice/kubepods-{qos}.slice/kubepods-{qos}-pod{self.id}.slice"
+        ret = f"/sys/fs/cgroup/{controller}/kubepods.slice/kubepods-{qos}.slice/kubepods-{qos}-pod{self.id}.slice"
+        LOGGER.debug(f"Got ret {ret}")
+        return ret
 
     def __repr__(self):
         return "Pod<Name=%s, id=%s, containers=%s>" % (self.name, self.id, self.containers)
@@ -87,7 +91,9 @@ class Pod:
         """
         pattern = r"([a-f-0-9]){8}-([a-f-0-9]){4}-([a-f-0-9]){4}-([a-f-0-9]){4}-([a-f-0-9]){12}"
         pod_id = re.search(pattern, container_name).group()
-        return Pod(container_name, uid=pod_id.replace('-', '_'))
+        ret = Pod(container_name, uid=pod_id.replace('-', '_'))
+        LOGGER.debug(f'Returned {ret}')
+        return ret
 
     @staticmethod
     def list_pods(namespace="default", controller='systemd', qos="besteffort") -> list:
@@ -129,5 +135,7 @@ class Pod:
             filtered_containers = [c for c in containers if f'docker-{c.id}.scope' in os.listdir(pod.path(controller, qos=qos))]
 
             pod.containers = filtered_containers
+
+        LOGGER.debug(f"Returned pods {pods}")
 
         return pods

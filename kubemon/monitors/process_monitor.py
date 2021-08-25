@@ -1,15 +1,12 @@
 from threading import Thread
 from ..utils import subtract_dicts
 from .base_monitor import BaseMonitor
+from ..log import create_logger
 import psutil
-import sys
 import os
 
 
 def parse_proc_net(pid):
-    # Assert if platform is not windows
-    assert 'win' not in sys.platform
-
     # Assert if pid exists in /proc
     assert str(pid) in os.listdir('/proc')
 
@@ -35,6 +32,7 @@ def parse_proc_net(pid):
             ret = {'iface': iface, 'rx': rx, 'tx': tx}
             yield ret
 
+LOGGER = create_logger(__name__)
 
 class ProcessMonitor(BaseMonitor):
     def __init__(self, *args, **kwargs):

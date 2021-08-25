@@ -1,13 +1,13 @@
 from kubemon.collector.commands import ConnectedMonitorsCommand, InstancesCommand, NotExistCommand, StartCommand
 from ..dataclasses import Client
-from ..config import DEFAULT_CLI_PORT
+from ..config import DATA_PATH, DEFAULT_CLI_PORT
 from ..utils import save_csv, receive, send_to
 from addict import Dict
 from datetime import datetime
-from sty import fg
 from os.path import join as join_path
 import socket
 import threading
+from ..log import create_logger
 
 def start_thread(func, args=tuple()):
     """
@@ -19,16 +19,17 @@ def start_thread(func, args=tuple()):
     """
     threading.Thread(target=func, args=args).start()
 
+LOGGER = create_logger(__name__)
 
-class Collector(object):
+class Collector:
     def __init__(self, address: str, port: int, cli_port=DEFAULT_CLI_PORT):
         self.__address = address
         self.__port = port
         self.__cli_port = cli_port
-        self.__mutex = threading.Lock()
         self.__instances = list()
-        self.__tag = f"[ {fg(255, 200, 100)}{self.__class__.__name__}{fg.rs} ] "
         self.dir_name = None
+        self.name = self.__class__.__name__
+        self.mutex = threading.Lock()
 
     @property
     def address(self):
@@ -41,28 +42,28 @@ class Collector(object):
     @property
     def cli_port(self):
         return self.__cli_port
-    
-    @property
-    def mutex(self):
-        return self.__mutex
-    
+       
     @property
     def connected_instances(self):
         return len(self.__instances)
 
     def __accept_connections(self, sockfd: socket.socket) -> None:
+        LOGGER.debug("Started function __accept_connections")
         while True:
             client, address = sockfd.accept()
 
             # Receiving the monitor name
             name, _ = receive(client, buffer_size=512)
+
+            LOGGER.debug(f"Received name={name}")
+
             client = Client(name, client, client.getsockname())
 
             self.mutex.acquire()
             self.__instances.append(client)
             self.mutex.release()
 
-            print("\t[ {}+{} ] {}@{}:{} connected".format(fg(0, 255, 0), fg.rs, name, *address), flush=True)
+            LOGGER.info(f"{name} connected. Address={address[0]}:{address[1]}")
 
             start_thread(self.__listen_monitors, (client,))
   
@@ -80,7 +81,7 @@ class Collector(object):
         while True:
             data, addr = receive(cli)
 
-            print("\t[ {}*{} ] Command '{}' received from {}:{}".format(fg(0, 90, 255), fg.rs, data, *addr), flush=True)
+            LOGGER.info(f"Received command '{data}' from {addr[0]}:{addr[1]}")
 
             if data:                
                 cmd = data[0] # Command
@@ -88,6 +89,7 @@ class Collector(object):
                 if cmd == "/start":
                     if len(data) == 2:
                         self.dir_name = data[1]
+                        LOGGER.debug(f"dir_name setted to {data}")
                     command = StartCommand(self.__instances, self.dir_name, self.address)
                 elif cmd == "/instances":
                     command = InstancesCommand(self.__instances)
@@ -98,6 +100,7 @@ class Collector(object):
 
                 message = command.execute()
                 send_to(cli, message, address=addr)
+                LOGGER.debug(f"Sending '{message}' to {addr[0]}:{addr[1]}")
 
     def __setup_socket(self, address: str, port: int, socktype: socket.SocketKind) -> socket.socket:
         """ 
@@ -112,7 +115,7 @@ class Collector(object):
             sockfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sockfd.bind((address, port))
         except:
-            print(f"{self.__tag}Error while trying to bind socket to port {port}", flush=True)
+            self.error(f"Error while trying to bind socket to port {port}")
             sockfd.close()
             exit(1)
         return sockfd
@@ -122,7 +125,7 @@ class Collector(object):
         
         # Setup socket
         sockfd = self.__setup_socket(self.address, self.cli_port, socket.SOCK_DGRAM)
-        print(f"{self.__tag}Started collector CLI at {self.address}:{self.cli_port}", flush=True)
+        LOGGER.info(f'Started collector CLI at {self.address}:{self.cli_port}')
 
         # Start listening for commands
         self.__listen_cli(sockfd)
@@ -133,7 +136,7 @@ class Collector(object):
         # Setup socket
         sockfd = self.__setup_socket(self.address, self.port, socket.SOCK_STREAM)
         sockfd.listen()
-        print(f"{self.__tag}Started collector at {self.address}:{self.port}", flush=True)
+        LOGGER.info(f"Started collector at {self.address}:{self.port}")
 
         # Start accepting incoming connections from monitors
         self.__accept_connections(sockfd)
@@ -142,6 +145,7 @@ class Collector(object):
         """ Start the collector """
         start_thread(self.__start_cli)
         start_thread(self.__start_collector)
+        LOGGER.debug("Call from function start")
 
     def __listen_monitors(self, client: Client) -> None:
         """ Listen for monitors. 
@@ -152,16 +156,16 @@ class Collector(object):
         
         Returns: None
         """
-        print("{}Creating new thread for client {}@{}:{}".format(self.__tag, client.name, *client.address), flush=True)
+        LOGGER.info(f"Creating new thread for client {client.name}@{client.address[0]}:{client.address[1]}")
 
         while True:
             try:
                 data, _ = receive(client.socket_obj, buffer_size=2048)
 
                 if data != None:
-                    print(f"{self.__tag}Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}", flush=True)
+                    LOGGER.info(f"Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}")
                 else:
-                    print(f"{self.__tag}Received nothing from ")
+                    LOGGER.info(f"Received nothing from {client.name}")
 
                 if isinstance(data, dict):
                     data = Dict(data)
@@ -173,12 +177,15 @@ class Collector(object):
                         dir_name = join_path(self.dir_name, data.source.split("_")[0])
                     
                     save_csv(data.data, data.source, dir_name=dir_name)
+                    LOGGER.debug(f"Saving data to {str(DATA_PATH)}/{self.dir_name}/{data.source}")
 
-                send_to(client.socket_obj, f"OK - {datetime.now()}")
+                msg = f"OK - {datetime.now()}"
+                send_to(client.socket_obj, msg)
+                LOGGER.debug(f"Sending '{msg}' to client {client.name}")
 
             except:
                 addr, port = client.address
-                print(f"\t[ {fg(255, 0, 0)}- {fg.rs}] Unregistered {client.name} {addr}:{port}", flush=True)
+                LOGGER.info(f"Unregistered {client.name} {addr}:{port}")
                 self.mutex.acquire()
                 self.__instances.remove(client)
                 self.mutex.release()

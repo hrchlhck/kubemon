@@ -2,17 +2,21 @@ from ..utils import get_containers, get_container_pid, get_host_ip, receive, sen
 from ..decorators import wrap_exceptions
 from ..config import START_MESSAGE, DEFAULT_MONITOR_INTERVAL
 from typing import Callable
-from threading import Thread
+from threading import Thread, Lock
+from ..log import create_logger
 import socket
 import docker
 import os
+import sys
 
+LOGGER = create_logger(__name__)
 
-class BaseMonitor(object):
+class BaseMonitor:
     def __init__(self, address, port, interval=DEFAULT_MONITOR_INTERVAL):
         self.__address = address
         self.__port = port
         self.__interval = interval
+        self.mutex = Lock()
 
     @property
     def address(self):
@@ -41,7 +45,7 @@ class BaseMonitor(object):
                        it will return based on a given pid.
         """
         if pid and str(pid) not in os.listdir('/proc'):
-            print(f"No pid {pid}")
+            LOGGER.debug(f"No pid {pid}")
 
         if not pid:
             fields = ['nr_active_file', 'nr_inactive_file', 'nr_mapped', 'nr_active_anon', 'nr_inactive_anon', 'pgpgin', 'pgpgout', 'pgfree', 'pgfault', 'pgmajfault', 'pgreuse']
@@ -49,17 +53,20 @@ class BaseMonitor(object):
             def to_dict(nested_lists):
                 atoms = map(lambda atom_list: atom_list.split(), nested_lists)
                 ret = {k: int(v) for k, v in atoms}
+                LOGGER.debug(f"Memory: {ret}")
                 return ret
 
             with open("/proc/vmstat", mode="r") as fd:
                 ret = to_dict(fd.readlines())
                 ret = filter_dict(ret, fields)
+            LOGGER.debug(f"Filtered data: {ret}")
         else:
             with open('/proc/%s/statm' % pid, mode='r') as fd:
                 infos = ['size', 'resident', 'shared',
                          'text', 'lib', 'data', 'dt']
                 ret = fd.read()
                 ret = {k: int(v) for k, v in zip(infos, ret.split())}
+                LOGGER.debug(f"Ret with pid {pid}: {ret}")
         return ret
 
     def get_source_name(self, pid=0, container_name=""):
@@ -82,6 +89,8 @@ class BaseMonitor(object):
 
         if self.name == "ProcessMonitor" or self.name == "DockerMonitor":
             ret = f"{self.name}_{ip}_{socket.gethostname()}_{container_name}_{pid}"
+        
+        LOGGER.debug(f"Got name {ret}")
 
         return ret
 
@@ -102,18 +111,20 @@ class BaseMonitor(object):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
             sockfd.connect((self.address, self.port))
 
-            print(f"[ {source_name} ] Connected collector to server", flush=True)
+            LOGGER.info(f"[ {source_name} ] Connected collector to server")
 
             send_to(sockfd, source_name)
+            LOGGER.debug(f"Sent my name to collector at {self.address}:{self.port}")
 
             try:
                 signal, _ = receive(sockfd)
+                LOGGER.debug(f"Received signal {START_MESSAGE}")
             except EOFError:
-                print("Monitor died")
+                LOGGER.error("Monitor died")
                 exit()
 
             if signal == START_MESSAGE:
-                print(f"[ {source_name} ] Starting", flush=True)
+                LOGGER.info(f"[ {source_name} ] Starting")
 
                 while True:
                     ret = function(*function_args)
@@ -122,10 +133,13 @@ class BaseMonitor(object):
 
                     try:
                         send_to(sockfd, message)
+                        LOGGER.debug(f"Sent {sys.getsizeof(message)} bytes to {self.address}:{self.port}")
 
                         recv, _ = receive(sockfd)
+                        
+                        LOGGER.debug(f"Received {recv} from {self.address}:{self.port}")
                     except EOFError:
-                        print(f"[ {source_name} ] Monitor died")
+                        LOGGER.error(f"[ {source_name} ] Monitor died")
                         exit()
 
     def collect(self):
@@ -135,17 +149,22 @@ class BaseMonitor(object):
         class_name = self.name
         
         if "OSMonitor" == class_name:
+            LOGGER.debug("Starting OSMonitor")
             self.send(function=self.collect, function_args=[])
         elif "ProcessMonitor" == class_name:
             client = docker.from_env()
             containers = get_containers(client)
             container_pids = [(c.name, get_container_pid(c)) for c in containers]
+
             for container_name, pid in container_pids:
                 t = Thread(target=self.collect, args=(container_name, pid))
                 t.start()
+                LOGGER.debug(f"Starting ProcessMonitor for container '{container_name}' with pid '{pid}'")
+
         elif "DockerMonitor" == class_name:
             for pod in self.pods:
                 for c in pod.containers:
                     t = Thread(target=self.collect, kwargs={
                                'container': c, 'pod': pod})
                     t.start()
+                    LOGGER.debug(f"Starting DockerMonitor for container '{c}' in pod '{pod}'")

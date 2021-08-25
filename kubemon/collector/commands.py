@@ -1,7 +1,7 @@
 from ..dataclasses import Client
 from typing import List
 from kubemon.utils import send_to
-from kubemon.config import ROOT_DIR, START_MESSAGE
+from kubemon.config import DATA_PATH, START_MESSAGE
 import dataclasses
 import abc
 
@@ -38,7 +38,7 @@ class StartCommand(Command):
 
         for instance in self._instances:
             send_to(instance.socket_obj, START_MESSAGE)
-        return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{ROOT_DIR}/{self._dir_name}"
+        return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}"
 
 
 class InstancesCommand(Command):

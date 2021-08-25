@@ -2,12 +2,15 @@ from kubemon.config import DEFAULT_DISK_PARTITION
 from ..utils import subtract_dicts, filter_dict, get_container_pid
 from .base_monitor import BaseMonitor
 from .process_monitor import ProcessMonitor
+from ..log import create_logger
 from ..entities.disk import Disk
 from ..pod import *
 from time import sleep
 from typing import List
 
 __all__ = ['DockerMonitor']
+
+LOGGER = create_logger(__name__)
 
 class DockerMonitor(BaseMonitor):
     def __init__(self, kubernetes=True, stats_path="/sys/fs/cgroup", *args, **kwargs):
@@ -42,6 +45,8 @@ class DockerMonitor(BaseMonitor):
         else:
             ret = f"{self.stats_path}/{cgroup_controller}.{stat}"
         
+        LOGGER.debug(f"Returned path {ret}")
+
         return ret
 
     @staticmethod
@@ -68,6 +73,8 @@ class DockerMonitor(BaseMonitor):
         else:
             ret = {k: to_int(v) for k, v in data}
 
+        DockerMonitor.debug(f"Returned {ret}")
+
         return ret
 
     def get_memory_usage(self, container: Pair=None, pod: Pod=None) -> dict:
@@ -86,6 +93,9 @@ class DockerMonitor(BaseMonitor):
             data = DockerMonitor.parse_fields(list(fd))
         
         ret = filter_dict(data, fields)
+
+        LOGGER.debug(f"Returned {ret}")
+
         return ret
 
     def get_disk_usage(self, container: Pair=None, pod: Pod=None, **kwargs) -> dict:
@@ -102,6 +112,8 @@ class DockerMonitor(BaseMonitor):
         disk = Disk(**kwargs)
         dev = f"{disk.major}:{disk.minor}"
 
+        LOGGER.debug(f"Selected disk {disk.name} maj:{disk.major} min:{disk.minor}")
+
         with open(path, mode='r') as fd:
             data = DockerMonitor.parse_fields(list(fd))
                         
@@ -109,6 +121,8 @@ class DockerMonitor(BaseMonitor):
         data = filter(lambda x: len(x) == 3, data)
         data = filter(lambda x: x[0] == dev, data)
         data = map(lambda x: x[1:], data)
+
+        LOGGER.debug(f"Returned from 'data = map(lambda x: x[1:], data)': {data}")
 
         # Map to dict
         ret = {k: v for k, v in data}
@@ -130,10 +144,11 @@ class DockerMonitor(BaseMonitor):
         """
         path_cpuacct = self.get_path(container=container, pod=pod, cgroup_controller='cpuacct', stat='stat')
         path_cpu = self.get_path(container=container, pod=pod, cgroup_controller='cpu', stat='stat')
-        ret = dict()
 
         with open(path_cpuacct, mode='r') as fd_cpuacct, open(path_cpu, mode='r') as fd_cpu:
             data = DockerMonitor.parse_fields(list(fd_cpuacct) + list(fd_cpu))
+
+        LOGGER.debug(f"Returned {data}")
 
         return data
 
@@ -149,6 +164,8 @@ class DockerMonitor(BaseMonitor):
         """
         ret = ProcessMonitor.get_net_usage(get_container_pid(container))
         
+        LOGGER.debug(f"Returned {ret}")
+
         return ret
 
     def get_stats(self, container: Pair, pod: Pod=None, disk_name=DEFAULT_DISK_PARTITION) -> dict:
@@ -172,6 +189,9 @@ class DockerMonitor(BaseMonitor):
         disk_new = subtract_dicts(disk, self.get_disk_usage(container, pod, disk_name=disk_name))
 
         ret = {**cpu_new, **memory_new, **network_new, **disk_new}
+        
+        LOGGER.debug("Called function")
+
         return ret
 
     def collect(self, container: Pair, pod: Pod=None) -> None:
@@ -183,6 +203,7 @@ class DockerMonitor(BaseMonitor):
             container (Pair): Container pair namedtuple to be monitored
         """
         func_args = (container, pod)
+        LOGGER.debug(f"Calling method with parameters: container={container}, pod={pod}, container_pid={get_container_pid(container)}")
         super(DockerMonitor, self).send(function=self.get_stats, function_args=func_args, container_name=container.name, pid=get_container_pid(container))
 
     def start(self) -> None:
