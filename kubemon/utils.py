@@ -5,14 +5,13 @@ from pathlib import Path
 from typing import List
 from requests import get
 from operator import sub
-from .config import ROOT_DIR
+from .config import DATA_PATH
 from .decorators import wrap_exceptions
 from .dataclasses import Pair
 from time import sleep
 import docker
 import socket
 import csv
-import sys
 import pickle
 
 __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data',
@@ -83,32 +82,25 @@ def send_data(socket: socket.socket, data: dict, source: str) -> None:
     socket.send(temp)
 
 
-def save_csv(_dict: dict, name: str, dir_name="") -> None:
+def save_csv(_dict: dict, name: str, dir_name="", output_dir=DATA_PATH) -> None:
     """ 
     Saves a dict into a csv 
 
     Args:
         _dict (dict): The dictionary that will be written or appended in the file
         name (str): The name of the file
-        dir_name (str): Subdirectory inside ROOT_DIR/data that the file will be saved
+        dir_name (str): Subdirectory inside .config.DATA_PATH that the file will be saved
 
     Raises:
         ValueError 
             if `dir_name` type isn't string 
     """
-    global ROOT_DIR
-
     filename = "%s.csv" % name
-
-    if 'win' in sys.platform:
-        output_dir = join(ROOT_DIR, "data")
-    else:
-        output_dir = ROOT_DIR
 
     if dir_name and not isinstance(dir_name, str):
         raise ValueError("Expected str instead of %s" % type(dir_name))
     elif dir_name and isinstance(dir_name, str):
-        output_dir = join(output_dir, dir_name)
+        output_dir = output_dir.joinpath(dir_name)
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
