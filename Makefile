@@ -1,3 +1,5 @@
+HOST_DIR=~/Documents/kubemon-data
+
 all: clean build
 
 build:
@@ -7,5 +9,7 @@ clean:
 	rm -rf $(shell find . -name __pycache__)
 
 collector:
-	clear
-	docker run -p 9822:9822/tcp -p 9880:9880/udp -v /tmp/kubemon:/tmp/kubemon --rm --name collector -it vpemfh7/kubemon:latest -t collector
+	docker run -p 9822:9822/tcp -p 9880:9880/udp -v $(HOST_DIR):/home/user/kubemon-data --rm --name collector -d vpemfh7/kubemon:latest -t collector
+
+stop_collector:
+	docker kill $(shell docker ps | grep collector | awk '{print $$1}')

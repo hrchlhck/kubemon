@@ -1,12 +1,12 @@
-FROM python:3.8
+FROM python:3.8-slim
 
-WORKDIR /opt/
+WORKDIR /home/user/
 
 STOPSIGNAL SIGINT
 
-ADD setup.py .
-ADD kubemon/ kubemon/
+COPY setup.py .
+COPY kubemon/ kubemon/
 
-RUN pip install . 
+RUN pip install --user .
 
-ENTRYPOINT ["python3", "-m", "kubemon"]
+ENTRYPOINT ["python", "-m", "kubemon"]

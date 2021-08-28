@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # Directories
-DATA_DIR = Path("/tmp/kubemon")
+DATA_DIR = Path("/home/user/kubemon-data")
 
 ## Logger path
 LOG_PATH = DATA_DIR / 'logs'
