@@ -73,7 +73,7 @@ class DockerMonitor(BaseMonitor):
         else:
             ret = {k: to_int(v) for k, v in data}
 
-        DockerMonitor.debug(f"Returned {ret}")
+        LOGGER.debug(f"Returned {ret}")
 
         return ret
 
