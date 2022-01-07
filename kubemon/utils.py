@@ -4,7 +4,6 @@ from os.path import join, isfile
 from pathlib import Path
 from typing import List
 from requests import get
-from operator import sub
 from .config import DATA_PATH
 from .decorators import wrap_exceptions
 from .dataclasses import Pair
@@ -18,11 +17,11 @@ __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data
            'save_csv', 'format_name', 'get_containers', 'get_container_pid', 'try_connect', 'receive', 'send_to']
 
 
-def subtract_dicts(dict1: dict, dict2: dict) -> dict:
+def subtract_dicts(dict1: dict, dict2: dict, operation=lambda x, y: x-y) -> dict:
     """ Subtracts values from dict1 and dict2 """
     if len(dict1) != len(dict2):
         raise KeyError("Mapping key not found")
-    values = map(lambda _dict: reduce(sub, _dict),
+    values = map(lambda _dict: reduce(operation, _dict),
                  zip(dict2.values(), dict1.values()))
     return dict(zip(dict1.keys(), map(lambda n: round(n, 4), values)))
 
@@ -188,7 +187,9 @@ def receive(_socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> s
         data, addr = _socket.recvfrom(buffer_size)
     else:
         data = _socket.recv(buffer_size)
-    return pickle.loads(data, encoding=encoding_type), addr
+
+    data = pickle.loads(data, encoding=encoding_type)
+    return data, addr
 
 
 @wrap_exceptions(KeyboardInterrupt)
