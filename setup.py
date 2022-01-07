@@ -8,5 +8,5 @@ setup(
     author='Pedro (vpemfh7) Horchulhack',
     author_email='pedro.horchulhack@ppgia.pucpr.br',
     license='MIT',
-    install_requires=['pandas', 'requests', 'psutil', 'docker', 'addict', 'sty']
+    install_requires=['wheel', 'pandas', 'requests', 'psutil', 'docker', 'addict', 'sty']
 )
