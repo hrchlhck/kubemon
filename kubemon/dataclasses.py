@@ -2,7 +2,7 @@ import dataclasses
 import socket
 from docker.models.containers import Container
 
-__all__ = ['Client', 'Pair']
+__all__ = ['Pair', 'Client']
 
 @dataclasses.dataclass
 class Client:

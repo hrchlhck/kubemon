@@ -8,7 +8,7 @@ import docker
 import os
 import sys
 
-__all__ = ['Pod', 'Pair']
+__all__ = ['Pair', 'Pod']
 
 Pair = namedtuple('Pair', ['name', 'id'])
 
@@ -36,7 +36,6 @@ def parse_container_id(container_id: str):
     if any(c for c in pattern if c in container_id):
         return re.split("[.-]", container_id)[1]
     return container_id
-
 
 class Pod:
     """ Class to represent (simply) a Pod object from Kubernetes """
