@@ -1,7 +1,9 @@
+import socket
 from ..dataclasses import Client
 from typing import List
-from kubemon.utils import send_to
-from kubemon.config import DATA_PATH, START_MESSAGE
+from kubemon.utils import receive, send_to
+from kubemon.config import DATA_PATH, START_MESSAGE, DEFAULT_DAEMON_PORT
+
 import dataclasses
 import abc
 
@@ -11,13 +13,15 @@ __all__ = [
     'NotExistCommand', 
     'StartCommand', 
     'InstancesCommand', 
-    'ConnectedMonitorsCommand', 
+    'ConnectedMonitorsCommand',
+    'StopCommand',
 ]
 
 COMMANDS = {
-    'StartCommand': '/start <output_dir>', 
-    'InstancesCommand': '/instances',
-    'ConnectedMonitorsCommand': '/monitors',
+    'StartCommand': 'start <output_dir>', 
+    'InstancesCommand': 'instances',
+    'ConnectedMonitorsCommand': 'monitors',
+    'StopCommand': 'stop'
 }
 
 @dataclasses.dataclass
@@ -27,18 +31,30 @@ class Command(abc.ABC):
         pass
 
 class StartCommand(Command):
-    def __init__(self, instances: List[Client], dir_name: str, addr: str):
-        self._instances = instances
+    def __init__(self, daemons: List[str], dir_name: str, addr: str):
+        self._daemons = daemons
         self._dir_name = dir_name
         self._monitor_addr = addr
 
     def execute(self) -> str:
-        if not len(self._instances):
+        if not len(self._daemons):
             return "There are no connected monitors to be started"
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            # Getting the total amount of monitors connected
+            total = 0
+            for addr in self._daemons:
+                print(addr)
+                sockfd.sendto('n_monitors'.encode(), (addr, DEFAULT_DAEMON_PORT))
+                data, _ = sockfd.recvfrom(8)
+                total += int(data.decode())
 
-        for instance in self._instances:
-            send_to(instance.socket_obj, START_MESSAGE)
-        return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}"
+        # Starting 
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            for addr in self._daemons:
+                sockfd.sendto(f'start {self._dir_name}'.encode(), (addr, DEFAULT_DAEMON_PORT))
+
+        return f"Starting {total} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}"
 
 
 class InstancesCommand(Command):
@@ -73,6 +89,22 @@ class ConnectedMonitorsCommand(Command):
             for monitor in os:
                 message += "- " + monitor + "\n"
         return message
+
+class StopCommand(Command):
+    def __init__(self, instances: List[Client], daemon_addresses: List[str], is_running: bool):
+        self._instances = instances
+        self._daemon_addresses = daemon_addresses
+        self._is_running = is_running
+    
+    def execute(self) -> str:
+        if not self._is_running:
+            return 'Unable to stop idling monitors'
+            
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            for addr in self._daemon_addresses:
+                send_to(sockfd, 'stop', (addr, DEFAULT_DAEMON_PORT))
+        
+        return f'Stopped {len(self._instances)} instances'
 
 class NotExistCommand(Command):
     def execute(self) -> str:

@@ -1,4 +1,5 @@
-from kubemon.collector.commands import ConnectedMonitorsCommand, InstancesCommand, NotExistCommand, StartCommand
+from typing import List
+from kubemon.collector.commands import ConnectedMonitorsCommand, InstancesCommand, NotExistCommand, StartCommand, StopCommand
 from ..dataclasses import Client
 from ..config import DATA_PATH, DEFAULT_CLI_PORT
 from ..utils import save_csv, receive, send_to
@@ -21,13 +22,15 @@ def start_thread(func, args=tuple()):
 
 LOGGER = create_logger(__name__)
 
-class Collector:
+class Collector(threading.Thread):
     def __init__(self, address: str, port: int, cli_port=DEFAULT_CLI_PORT):
+        threading.Thread.__init__(self)
         self.__address = address
         self.__port = port
         self.__cli_port = cli_port
         self.__instances = list()
         self.dir_name = None
+        self.is_running = False
         self.name = self.__class__.__name__
         self.mutex = threading.Lock()
 
@@ -46,6 +49,16 @@ class Collector:
     @property
     def connected_instances(self):
         return len(self.__instances)
+    
+    @property
+    def daemons(self) -> List[str]:
+        unique = []
+
+        for client in self.__instances:
+            if client.address[0] not in unique:
+                unique.append(client.address[0])
+
+        return unique
 
     def __accept_connections(self, sockfd: socket.socket) -> None:
         LOGGER.debug("Started function __accept_connections")
@@ -66,6 +79,8 @@ class Collector:
             LOGGER.info(f"{name} connected. Address={address[0]}:{address[1]}")
 
             start_thread(self.__listen_monitors, (client,))
+
+            print(self.daemons)
   
     def __listen_cli(self, cli: socket.socket) -> None:
         """ 
@@ -83,18 +98,24 @@ class Collector:
 
             LOGGER.info(f"Received command '{data}' from {addr[0]}:{addr[1]}")
 
-            if data:                
-                cmd = data[0] # Command
+            if data:
+                print(data)
+                data = data.split()
+                cmd = data[0].lower() # Command
 
-                if cmd == "/start":
+                if cmd == "start":
                     if len(data) == 2:
                         self.dir_name = data[1]
-                        LOGGER.debug(f"dir_name setted to {data}")
-                    command = StartCommand(self.__instances, self.dir_name, self.address)
-                elif cmd == "/instances":
+                        LOGGER.debug(f"dir_name setted to {self.dir_name}")
+                    command = StartCommand(self.daemons, self.dir_name, self.address)
+                    self.is_running = True
+                elif cmd == "instances":
                     command = InstancesCommand(self.__instances)
-                elif cmd == "/monitors":
+                elif cmd == "monitors":
                     command = ConnectedMonitorsCommand(self.__instances)
+                elif cmd == "stop":
+                    self.is_running = False
+                    command = StopCommand(self.__instances, self.daemons, self.is_running)
                 else:
                     command = NotExistCommand()           
 
@@ -141,10 +162,10 @@ class Collector:
         # Start accepting incoming connections from monitors
         self.__accept_connections(sockfd)
     
-    def start(self) -> None:
+    def run(self) -> None:
         """ Start the collector """
         start_thread(self.__start_cli)
-        start_thread(self.__start_collector)
+        self.__start_collector()
         LOGGER.debug("Call from function start")
 
     def __listen_monitors(self, client: Client) -> None:
@@ -161,7 +182,7 @@ class Collector:
         while True:
             try:
                 data, _ = receive(client.socket_obj, buffer_size=2048)
-
+                
                 if data != None:
                     LOGGER.info(f"Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}")
                 else:
@@ -186,6 +207,7 @@ class Collector:
             except:
                 addr, port = client.address
                 LOGGER.info(f"Unregistered {client.name} {addr}:{port}")
+                LOGGER.error('What happened??', exc_info=1)
                 self.mutex.acquire()
                 self.__instances.remove(client)
                 self.mutex.release()

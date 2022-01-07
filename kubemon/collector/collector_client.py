@@ -1,13 +1,15 @@
 from ..utils import receive, send_to
+import threading
 import socket
 import sys
 
 __all__ = ["CollectorClient"]
 
-class CollectorClient(object):
+class CollectorClient(threading.Thread):
     def __init__(self, address: str, port: int):
         self.__address = address
         self.__port = port
+        threading.Thread.__init__(self)
     
     @property
     def address(self):
@@ -24,7 +26,7 @@ class CollectorClient(object):
             print(data)
             return data
 
-    def start(self):
+    def run(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             cmd = ""
             while cmd != "exit":
