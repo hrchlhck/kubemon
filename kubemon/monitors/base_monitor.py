@@ -1,22 +1,37 @@
-from ..utils import get_containers, get_container_pid, get_host_ip, receive, send_to, filter_dict
+from ..utils import (
+    get_host_ip, receive, 
+    send_to, filter_dict
+)
+
+from ..config import (
+    DEFAULT_MONITOR_PORT, START_MESSAGE, 
+    DEFAULT_MONITOR_INTERVAL
+)
+
 from ..decorators import wrap_exceptions
-from ..config import START_MESSAGE, DEFAULT_MONITOR_INTERVAL
 from typing import Callable
-from threading import Thread, Lock
+from threading import Lock
 from ..log import create_logger
+from enum import Enum
+
 import socket
-import docker
 import os
 import sys
 
 LOGGER = create_logger(__name__)
 
+class MonitorFlag(Enum):
+    IDLE = 0
+    RUNNING = 1
+    NOT_CONNECTED = 2
+
 class BaseMonitor:
-    def __init__(self, address, port, interval=DEFAULT_MONITOR_INTERVAL):
+    def __init__(self, address, port=DEFAULT_MONITOR_PORT, interval=DEFAULT_MONITOR_INTERVAL):
         self.__address = address
         self.__port = port
         self.__interval = interval
-        self.mutex = Lock()
+        self.__flag = MonitorFlag.NOT_CONNECTED
+        self.__stop_request = False
 
     @property
     def address(self):
@@ -33,6 +48,34 @@ class BaseMonitor:
     @property
     def name(self):
         return self.__class__.__name__
+    
+    @property
+    def flag(self) -> MonitorFlag:
+        return self.__flag
+    
+    @flag.setter
+    def flag(self, val: MonitorFlag) -> None:
+        if isinstance(val, MonitorFlag):
+            self.__flag = val
+        else:
+            raise ValueError('The value must be a MonitorFlag instance')
+    
+    @property
+    def stop_request(self) -> bool:
+        return self.__stop_request
+    
+    @stop_request.setter
+    def stop_request(self, val: bool) -> None:
+        if isinstance(val, bool):
+            self.__stop_request = val
+        else:
+            raise ValueError('The value must be a boolean')
+
+    def __str__(self) -> str:
+        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()}>'
+    
+    def __repr__(self) -> str:
+        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()}>'
 
     @staticmethod
     def get_memory_usage(pid=None):
@@ -116,55 +159,35 @@ class BaseMonitor:
             send_to(sockfd, source_name)
             LOGGER.debug(f"Sent my name to collector at {self.address}:{self.port}")
 
-            try:
-                signal, _ = receive(sockfd)
-                LOGGER.debug(f"Received signal {START_MESSAGE}")
-            except EOFError:
-                LOGGER.error("Monitor died")
-                exit()
+            while True:
+                try:
+                    signal, _ = receive(sockfd)
+                    LOGGER.debug(f"Received signal {START_MESSAGE}")
+                except EOFError:
+                    LOGGER.error("Monitor died")
+                    exit()
 
-            if signal == START_MESSAGE:
-                LOGGER.info(f"[ {source_name} ] Starting")
+                if signal == START_MESSAGE:
+                    LOGGER.info(f"[ {source_name} ] Starting")
 
-                while True:
-                    ret = function(*function_args)
+                    self.flag = MonitorFlag.RUNNING
+                    
+                    while not self.stop_request:
+                        ret = function(*function_args)
 
-                    message = {"source": source_name, "data": ret}
+                        message = {"source": source_name, "data": ret}
 
-                    try:
-                        send_to(sockfd, message)
-                        LOGGER.debug(f"Sent {sys.getsizeof(message)} bytes to {self.address}:{self.port}")
+                        try:
+                            send_to(sockfd, message)
+                            LOGGER.debug(f"Sent {sys.getsizeof(message)} bytes to {self.address}:{self.port}")
 
-                        recv, _ = receive(sockfd)
-                        
-                        LOGGER.debug(f"Received {recv} from {self.address}:{self.port}")
-                    except EOFError:
-                        LOGGER.error(f"[ {source_name} ] Monitor died")
-                        exit()
-
-    def collect(self):
-        """ Method to be implemented by child classes """
-
-    def start(self):
-        class_name = self.name
-        
-        if "OSMonitor" == class_name:
-            LOGGER.debug("Starting OSMonitor")
-            self.send(function=self.collect, function_args=[])
-        elif "ProcessMonitor" == class_name:
-            client = docker.from_env()
-            containers = get_containers(client)
-            container_pids = [(c.name, get_container_pid(c)) for c in containers]
-
-            for container_name, pid in container_pids:
-                t = Thread(target=self.collect, args=(container_name, pid))
-                t.start()
-                LOGGER.debug(f"Starting ProcessMonitor for container '{container_name}' with pid '{pid}'")
-
-        elif "DockerMonitor" == class_name:
-            for pod in self.pods:
-                for c in pod.containers:
-                    t = Thread(target=self.collect, kwargs={
-                               'container': c, 'pod': pod})
-                    t.start()
-                    LOGGER.debug(f"Starting DockerMonitor for container '{c}' in pod '{pod}'")
+                            recv, _ = receive(sockfd)
+                            
+                            LOGGER.debug(f"Received {sys.getsizeof(recv)} from {self.address}:{self.port}")
+                        except EOFError:
+                            LOGGER.error(f"[ {source_name} ] Monitor died")
+                            exit()
+                    
+                    if self.stop_request:
+                        LOGGER.info(f'Stopped monitor {source_name}')
+                        self.stop_request = False
