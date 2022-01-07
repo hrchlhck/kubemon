@@ -1,25 +1,11 @@
 from ..monitors import *
 from ..collector import *
-from ..config import DEFAULT_CLI_PORT, DEFAULT_MONITOR_PORT
+from ..config import DEFAULT_CLI_PORT, DEFAULT_MONITOR_INTERVAL, DEFAULT_MONITOR_PORT
+from ..monitors import Kubemond
 
 import argparse
 
-MODULES = ['collector', 'monitor', 'process', 'docker']
-
-def get_system(sys_type, args):
-    if args.host and args.port:
-        if sys_type == 'collector':
-            return Collector(address=args.host, port=int(args.port))
-        elif sys_type == 'monitor':
-            return OSMonitor(address=args.host, port=int(args.port), interval=int(args.interval))
-        elif sys_type == 'process':
-            return ProcessMonitor(address=args.host, port=int(args.port), interval=int(args.interval))
-        elif sys_type == 'docker':
-            return DockerMonitor(address=args.host, port=int(args.port), interval=int(args.interval))
-        elif sys_type == 'cli':
-            return CollectorClient(address=args.host, port=DEFAULT_CLI_PORT)
-    elif not args.host:
-        print("Missing --host/-H IP")
+MODULES = ['collector', 'daemon']
 
 parser = argparse.ArgumentParser(description='Kubemon commands')
 
@@ -30,6 +16,12 @@ parser.add_argument('-H', '--host', default='0.0.0.0', help='Host that any of sy
 parser.add_argument('-p', '--port', default=DEFAULT_MONITOR_PORT, help='Port of the host')
 parser.add_argument('-f', '--files', nargs=2, help='Files for merge', metavar=('FILE1', 'FILE2'))
 parser.add_argument('-c', '--command', default="", nargs='*', help="Command for be executing on CollectorClient")
-parser.add_argument('-i', '--interval', default=5, help="Data collection rate by monitors")
+parser.add_argument('-i', '--interval', default=DEFAULT_MONITOR_INTERVAL, help="Data collection rate by monitors")
 
 args = parser.parse_args()
+
+SYSTEMS = {
+    'collector': Collector(address=args.host, port=int(args.port)),
+    'daemon': Kubemond(address=args.host, port=int(args.port), interval=int(args.interval)),
+    'cli': CollectorClient(address=args.host, port=DEFAULT_CLI_PORT)
+}

@@ -1,22 +1,20 @@
+from kubemon.cli.commands import SYSTEMS
 from kubemon.log import create_logger
+from kubemon.config import LOGGING_LEVEL
+
 from .exceptions.platform_exception import NotLinuxException
 from .cli import *
 from .merge import merge
 from .collector.commands import COMMANDS
-from multiprocessing import Process
 
 import sys
-import logging
-
-def start(instance):
-    instance.start()
 
 if __name__ == "__main__":
 
     if 'win' in sys.platform:
         raise NotLinuxException("Kubemon is only available for Linux-based Operating Systems. Sorry.")
         
-    LOGGER = create_logger(__name__, level=logging.DEBUG)
+    LOGGER = create_logger(__name__, level=LOGGING_LEVEL)
 
     if args.type == 'merge':
         if not args.files:
@@ -26,18 +24,15 @@ if __name__ == "__main__":
 
     if args.type in MODULES:
         LOGGER.debug(f"Starting application {args.type}")
-        get_system(args.type, args).start()
+        SYSTEMS[args.type].start()
 
     if args.type == 'cli' and args.command:
         LOGGER.debug("Executed CLI")
-        get_system(args.type, args).exec(args.command)
-
-    if args.type == 'all':
-        LOGGER.debug("Starting application with all monitors")
-        for s in MODULES[1:]:
-            s = get_system(s, args)
-            Process(target=start, args=(s,)).start()
-    
+        SYSTEMS[args.type].exec(args.command)
+    elif args.type == 'cli' and not args.command:
+        LOGGER.debug("Executed CLI")
+        SYSTEMS[args.type].start()
+   
     if args.list:
         print("Available modules:")
         LOGGER.debug("Listing modules")
