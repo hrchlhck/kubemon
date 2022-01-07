@@ -1,5 +1,8 @@
+from threading import Thread
+
+from docker.models.containers import Container
 from kubemon.config import DEFAULT_DISK_PARTITION
-from ..utils import subtract_dicts, filter_dict, get_container_pid
+from ..utils import subtract_dicts, filter_dict, get_container_pid, public
 from .base_monitor import BaseMonitor
 from .process_monitor import ProcessMonitor
 from ..log import create_logger
@@ -12,12 +15,18 @@ __all__ = ['DockerMonitor']
 
 LOGGER = create_logger(__name__)
 
-class DockerMonitor(BaseMonitor):
-    def __init__(self, kubernetes=True, stats_path="/sys/fs/cgroup", *args, **kwargs):
+class DockerMonitor(BaseMonitor, Thread):
+    def __init__(self, container: Container, pod: Pod, pid: int, kubernetes=True, stats_path="/sys/fs/cgroup", *args, **kwargs):
+        self.__container = container
+        self.__pid = pid
+        self.__pod = pod
         super(DockerMonitor, self).__init__(*args, **kwargs)
         self.__stats_path = stats_path
+
         if kubernetes:
             self.__pods = Pod.list_pods(namespace="*")
+
+        Thread.__init__(self)
 
     @property
     def pods(self):
@@ -26,6 +35,18 @@ class DockerMonitor(BaseMonitor):
     @property
     def stats_path(self):
         return self.__stats_path
+    
+    @property
+    def pid(self) -> int:
+        return self.__pid
+
+    @property
+    def container(self) -> Container:
+        return self.__container
+    
+    @property
+    def pod(self) -> Pod:
+        return self.__pod
 
     def get_path(self, cgroup_controller: str, stat: str, container: Pair=None, pod: Pod=None) -> str:
         """ 
@@ -193,18 +214,7 @@ class DockerMonitor(BaseMonitor):
         LOGGER.debug("Called function")
 
         return ret
-
-    def collect(self, container: Pair, pod: Pod=None) -> None:
-        """ 
-        Method to collects all data from all container processes
-
-        Args:
-            pod (Pod): Pod container object
-            container (Pair): Container pair namedtuple to be monitored
-        """
-        func_args = (container, pod)
-        LOGGER.debug(f"Calling method with parameters: container={container}, pod={pod}, container_pid={get_container_pid(container)}")
-        super(DockerMonitor, self).send(function=self.get_stats, function_args=func_args, container_name=container.name, pid=get_container_pid(container))
-
-    def start(self) -> None:
-        super(DockerMonitor, self).start()
+   
+    def run(self) -> None:
+        LOGGER.debug(f"Calling method with parameters: container={self.container}, pod={self.pod}, container_pid={get_container_pid(self.container)}")
+        self.send(function=self.get_stats, function_args=(self.container, self.pod), container_name=self.container.name, pid=get_container_pid(self.container))

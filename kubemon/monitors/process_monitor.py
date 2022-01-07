@@ -1,9 +1,12 @@
 from threading import Thread
-from ..utils import subtract_dicts
+
+from docker.models.containers import Container
+from ..utils import subtract_dicts, get_host_ip
 from .base_monitor import BaseMonitor
 from ..log import create_logger
 import psutil
 import os
+import socket
 
 
 def parse_proc_net(pid):
@@ -34,9 +37,26 @@ def parse_proc_net(pid):
 
 LOGGER = create_logger(__name__)
 
-class ProcessMonitor(BaseMonitor):
-    def __init__(self, *args, **kwargs):
+class ProcessMonitor(BaseMonitor, Thread):
+    def __init__(self, container: Container, pid: int, *args, **kwargs):
+        self.__container = container
+        self.__pid = pid
         super(ProcessMonitor, self).__init__(*args, **kwargs)
+        Thread.__init__(self)
+
+    @property
+    def pid(self) -> int:
+        return self.__pid
+
+    @property
+    def container(self) -> Container:
+        return self.__container
+
+    def __str__(self) -> str:
+        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.__pid}>'
+    
+    def __repr__(self) -> str:
+        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.__pid}>'
 
     @staticmethod
     def get_cpu_times(process: psutil.Process) -> dict:
@@ -126,24 +146,6 @@ class ProcessMonitor(BaseMonitor):
         ret = {**io_new, **cpu_new, **net_new, "cpu_percent": cpu_percent, **mem_new}
         return ret
 
-    def collect(self, container_name: str, pid: int) -> None:
-        """ 
-        Method to collects all data from all container processes.
+    def run(self) -> None:
+        self.send(function=self.get_pchild_usage, function_args=(self.interval, self.pid), pid=self.pid, container_name=self.container.name)
 
-        This function will create a thread for each process to collect data from.
-
-        Args:
-            container_name (str): Container name
-            pid (int): Pid of the container process
-
-        """
-        process = psutil.Process(pid=pid)
-
-        for child in process.children():
-            kwargs = {"function_args": (self.interval, child.pid), "pid": child.pid, "container_name": container_name, "function": self.get_pchild_usage}
-            t = Thread(target=self.send, kwargs=kwargs)
-            t.start()
-
-    def start(self) -> None:
-        """ Method to start ProcessMonitor """
-        super(ProcessMonitor, self).start()

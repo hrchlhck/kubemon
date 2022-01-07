@@ -4,12 +4,14 @@ from ..entities.cpu import CPU
 from ..entities.disk import Disk
 from ..entities.network import Network
 from ..utils import subtract_dicts
+from threading import Thread
 import time
 
 
-class OSMonitor(BaseMonitor):
+class OSMonitor(BaseMonitor, Thread):
     def __init__(self, *args, **kwargs):
         super(OSMonitor, self).__init__(*args, **kwargs)
+        Thread.__init__(self)
         
     def __get_data(self):
         disk = Disk(disk_name=DEFAULT_DISK_PARTITION).get_usage()
@@ -36,5 +38,5 @@ class OSMonitor(BaseMonitor):
 
         return ret
 
-    def start(self):
-        super(OSMonitor, self).start()
+    def run(self) -> None:
+        self.send(function=self.collect, function_args=[])
