@@ -1,10 +1,9 @@
 import logging
-from .config import LOG_PATH
+from .config import LOG_PATH, LOGGING_LEVEL
 
 __all__ = ['create_logger']
 
-
-def create_logger(name: str, level=logging.DEBUG) -> logging.Logger:
+def create_logger(name: str, level=LOGGING_LEVEL) -> logging.Logger:
     logger = logging.getLogger(name)
 
     logger.setLevel(level)
