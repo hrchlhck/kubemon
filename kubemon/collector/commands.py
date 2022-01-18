@@ -31,30 +31,18 @@ class Command(abc.ABC):
         pass
 
 class StartCommand(Command):
-    def __init__(self, daemons: List[str], dir_name: str, addr: str):
-        self._daemons = daemons
+    def __init__(self, instances: List[Client], dir_name: str, addr: str):
+        self._instances = instances
         self._dir_name = dir_name
         self._monitor_addr = addr
 
     def execute(self) -> str:
-        if not len(self._daemons):
+        if not len(self._instances):
             return "There are no connected monitors to be started"
-        
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            # Getting the total amount of monitors connected
-            total = 0
-            for addr in self._daemons:
-                print(addr)
-                sockfd.sendto('n_monitors'.encode(), (addr, DEFAULT_DAEMON_PORT))
-                data, _ = sockfd.recvfrom(8)
-                total += int(data.decode())
 
-        # Starting 
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in self._daemons:
-                sockfd.sendto(f'start {self._dir_name}'.encode(), (addr, DEFAULT_DAEMON_PORT))
-
-        return f"Starting {total} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}"
+        for instance in self._instances:
+            send_to(instance.socket_obj, START_MESSAGE)
+        return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}"
 
 
 class InstancesCommand(Command):

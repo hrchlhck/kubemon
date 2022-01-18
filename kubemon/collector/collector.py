@@ -100,14 +100,13 @@ class Collector(threading.Thread):
 
             if data:
                 print(data)
-                data = data.split()
                 cmd = data[0].lower() # Command
 
                 if cmd == "start":
                     if len(data) == 2:
                         self.dir_name = data[1]
                         LOGGER.debug(f"dir_name setted to {self.dir_name}")
-                    command = StartCommand(self.daemons, self.dir_name, self.address)
+                    command = StartCommand(self.__instances, self.dir_name, self.address)
                     self.is_running = True
                 elif cmd == "instances":
                     command = InstancesCommand(self.__instances)
