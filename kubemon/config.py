@@ -1,10 +1,10 @@
 from pathlib import Path
 import logging
 
-LOGGING_LEVEL = logging.INFO
+LOGGING_LEVEL = logging.DEBUG
 
 # Directories
-DATA_DIR = Path(f"/home/user/kubemon-data")
+DATA_DIR = Path(f"/home/kubemon/kubemon-data")
 
 ## Logger path
 LOG_PATH = DATA_DIR / 'logs'
@@ -29,12 +29,12 @@ DEFAULT_DISK_PARTITION = 'sda'
 
 # Creating base directory
 if not DATA_DIR.exists():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True)
 
 # Creating log directory
 if not LOG_PATH.exists():
-    LOG_PATH.mkdir(parents=True, exist_ok=True)
+    LOG_PATH.mkdir()
 
 # Creating data directory
 if not DATA_PATH.exists():
-    DATA_PATH.mkdir(parents=True, exist_ok=True)
+    DATA_PATH.mkdir()
