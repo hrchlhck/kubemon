@@ -2,7 +2,7 @@ from threading import Thread
 
 from docker.models.containers import Container
 from kubemon.config import DEFAULT_DISK_PARTITION
-from ..utils import subtract_dicts, filter_dict, get_container_pid, public
+from ..utils import subtract_dicts, filter_dict, get_container_pid
 from .base_monitor import BaseMonitor
 from .process_monitor import ProcessMonitor
 from ..log import create_logger
@@ -14,6 +14,74 @@ from typing import List
 __all__ = ['DockerMonitor']
 
 LOGGER = create_logger(__name__)
+
+class StatParser:
+    ''' Class to parse docker metrics to fit into a CSV format, by saving into a flat dictionary. '''
+
+    def _parse_blkio_operations(data: List[dict]) -> dict:
+        ''' Auxiliary function to StatParser.blkio to remove 'Major' and 'Minor' keys. 
+            This function gets only the operations made by blkio counter.
+        '''
+        ret = dict()
+        for d in data:
+            ret[d['op'].lower()] = d['value']
+        return ret
+    
+    @staticmethod
+    def blkio(data: dict) -> dict:
+        ''' Retrieves the blkio counter statistics from a container '''
+        ret = dict()
+        for key, value in data.items():
+            if value:
+                value = StatParser._parse_blkio_operations(value)
+                for k, v in value.items():
+                    ret[f'{key}_{k}'] = v
+        return ret
+
+    @staticmethod
+    def cpu(data: dict) -> dict:
+        ''' Retrieves the cpu counter statistics from a container '''
+        name_cpu = lambda x, suffix: {f'cpu{i}_{suffix}': val for i, val in enumerate(x)}
+        ret = dict()
+
+        for key, value in data.items():
+            if isinstance(value, dict):
+                ret[key] = dict()
+                for k, v in data[key].items():
+                    ret[key][f'cpu_{k}'] = v
+            else:
+                ret[key] = value
+
+        ret = {
+            **name_cpu(data['cpu_usage']['percpu_usage'], 'usage'),
+            'system_cpu_usage': data['system_cpu_usage'],
+            **data['throttling_data']
+        }
+        return ret
+
+    @staticmethod
+    def memory(data: dict) -> dict:
+        ''' Retrieves the memory counter statistics from a container '''
+        fields = ['rss', 'cache', 'mapped_file', 'pgpgin', 'pgpgout', 'pgfault', 'pgmajfault', 'active_anon', 'inactive_anon', 'active_file', 'inactive_file', 'unevictable']
+        ret = dict()
+
+        for k, v in data.items():
+            ret[f'memory_{k}'] = v 
+        
+        ret = filter_dict(ret, fields)
+        return ret
+    
+    @staticmethod
+    def network(data: dict) -> dict:
+        ''' Retrieves the network counter statistics from a container '''
+        ret = dict()
+
+        # Here it flattens the 'networks' dictionary(ies)
+        for net in data:
+            for k, v in data[net].items():
+                ret[f'net_{net}_{k}'] = v
+
+        return ret
 
 class DockerMonitor(BaseMonitor, Thread):
     def __init__(self, container: Container, pod: Pod, pid: int, kubernetes=True, stats_path="/sys/fs/cgroup", *args, **kwargs):
@@ -214,7 +282,31 @@ class DockerMonitor(BaseMonitor, Thread):
         LOGGER.debug("Called function")
 
         return ret
+    
+    def _get_stats(self, *args, **kwargs) -> dict:
+        stats = self.container.stats(stream=False)
+
+        ret_old = {
+            **StatParser.cpu(stats['cpu_stats']),
+            **StatParser.blkio(stats['blkio_stats']),
+            **StatParser.memory(stats['memory_stats']),
+            **StatParser.network(stats['networks']),
+        }
+
+        # Subtracting 2 because the 'container.stats' response takes 1 second to process
+        sleep(self.interval - 2)
+
+        stats = self.container.stats(stream=False)
+
+        ret = {
+            **StatParser.cpu(stats['cpu_stats']),
+            **StatParser.blkio(stats['blkio_stats']),
+            **StatParser.memory(stats['memory_stats']),
+            **StatParser.network(stats['networks']),
+        }
+
+        return subtract_dicts(ret_old, ret)
    
     def run(self) -> None:
         LOGGER.debug(f"Calling method with parameters: container={self.container}, pod={self.pod}, container_pid={get_container_pid(self.container)}")
-        self.send(function=self.get_stats, function_args=(self.container, self.pod), container_name=self.container.name, pid=get_container_pid(self.container))
+        self.send(function=self._get_stats, function_args=(self.container, self.pod), container_name=self.container.name, pid=get_container_pid(self.container))

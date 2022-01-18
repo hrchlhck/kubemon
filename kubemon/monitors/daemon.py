@@ -39,7 +39,6 @@ class Kubemond(threading.Thread):
         self.__mutex = threading.Lock()
         self.__monitors = []
         self.__directory = None
-        self.__init_monitors()
         self.__functions = {
             'start': self.start_modules,
             'stop': self.stop_modules,
@@ -150,7 +149,7 @@ class Kubemond(threading.Thread):
     def start_modules(self, directory: str, *args) -> Any:
         print("Called start_modules")
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            send_to(sockfd, ["/start", directory], (self.address, DEFAULT_CLI_PORT))
+            send_to(sockfd, ["start", directory], (self.address, DEFAULT_CLI_PORT))
             self.__directory = directory
 
             data, _ = receive(sockfd)
@@ -197,13 +196,15 @@ class Kubemond(threading.Thread):
                     
                     if self.is_running:
                         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-                            send_to(sockfd, ["/start", self.directory], (self.address, DEFAULT_CLI_PORT))
+                            send_to(sockfd, ["start", self.directory], (self.address, DEFAULT_CLI_PORT))
                             data, _ = receive(sockfd)
                             
                             if data is not None:
                                 print(f"Received {sys.getsizeof(data)} bytes")
 
     def run(self) -> None:
+        self.__init_monitors()
+
         print("Started daemon")
 
         # Create all monitor instances 
@@ -230,12 +231,13 @@ class Kubemond(threading.Thread):
 
 def docker_instances(address: str, port: int, interval: int) -> list:
     monitors = list()
-    pods = Pod.list_pods(namespace="*")
+    client = from_env()
 
-    for pod in pods:
-        for c in pod.containers:
-            monitor = DockerMonitor(c, pod, get_container_pid(c), address=address, port=port, interval=interval)
-            monitors.append(monitor)
+    containers = [container for container in client.containers.list() if 'POD' not in container.name]
+
+    for c in containers:
+        monitor = DockerMonitor(c, None, get_container_pid(c), address=address, port=port, interval=interval)
+        monitors.append(monitor)
     
     return monitors
 
