@@ -13,14 +13,7 @@ class Network(BaseEntity):
         n = net_io_counters()
         nc = net_connections(kind='all')
         ret = {
-            "bytes_sent": n.bytes_sent,
-            "bytes_recv": n.bytes_recv,
-            "packets_sent": n.packets_sent,
-            "packets_recv": n.packets_recv,
-            "dropin": n.dropin,
-            "dropout": n.dropout,
-            "errin": n.errin,
-            "errout": n.errout,
+            **n._asdict(),
             "num_connections": len(nc),
         }
         return ret

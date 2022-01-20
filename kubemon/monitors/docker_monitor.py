@@ -309,4 +309,4 @@ class DockerMonitor(BaseMonitor, Thread):
    
     def run(self) -> None:
         LOGGER.debug(f"Calling method with parameters: container={self.container}, pod={self.pod}, container_pid={get_container_pid(self.container)}")
-        self.send(function=self._get_stats, function_args=(self.container, self.pod), container_name=self.container.name, pid=get_container_pid(self.container))
+        self.send(function=self.get_stats, function_args=(self.container, self.pod), container_name=self.container.name, pid=get_container_pid(self.container))

@@ -231,13 +231,12 @@ class Kubemond(threading.Thread):
 
 def docker_instances(address: str, port: int, interval: int) -> list:
     monitors = list()
-    client = from_env()
+    pods = Pod.list_pods(namespace='*')
 
-    containers = [container for container in client.containers.list() if 'POD' not in container.name]
-
-    for c in containers:
-        monitor = DockerMonitor(c, None, get_container_pid(c), address=address, port=port, interval=interval)
-        monitors.append(monitor)
+    for p in pods:
+        for c in p.containers:
+            monitor = DockerMonitor(c, p, get_container_pid(c), address=address, port=port, interval=interval)
+            monitors.append(monitor)
     
     return monitors
 
