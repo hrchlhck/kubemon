@@ -12,6 +12,7 @@ import docker
 import socket
 import csv
 import pickle
+import json
 
 __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data',
            'save_csv', 'format_name', 'get_containers', 'get_container_pid', 'try_connect', 'receive', 'send_to']
@@ -147,8 +148,12 @@ def get_containers(client: docker.client.DockerClient, namespace='', to_tuple=Fa
 
 
 def get_container_pid(container):
-    cmd = ['docker', 'inspect', '-f', '{{.State.Pid}}', container.id]
-    return int(check_output(cmd))
+    get_pid = lambda x: x['State']['Pid']
+
+    with open(f'/var/lib/docker/containers/{container.id}/config.v2.json', 'r') as fp:
+        data = fp.read()
+        data = json.loads(data)
+        return get_pid(data)
 
 
 def try_connect(addr: str, port: int, _socket: socket.socket, timeout: int) -> None:
