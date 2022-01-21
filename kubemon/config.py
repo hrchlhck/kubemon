@@ -1,7 +1,7 @@
 from pathlib import Path
 import logging
 
-LOGGING_LEVEL = logging.DEBUG
+LOGGING_LEVEL = logging.INFO
 
 # Directories
 DATA_DIR = Path(f"/home/kubemon/kubemon-data")

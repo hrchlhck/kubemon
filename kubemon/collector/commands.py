@@ -1,10 +1,10 @@
-import socket
 from ..dataclasses import Client
 from typing import List
 from kubemon.utils import receive, send_to
 from kubemon.config import DATA_PATH, START_MESSAGE, DEFAULT_DAEMON_PORT
 
 import dataclasses
+import socket
 import abc
 
 __all__ = [
@@ -38,29 +38,32 @@ class StartCommand(Command):
 
     def execute(self) -> str:
         if not len(self._instances):
-            return "There are no connected monitors to be started"
+            return "There are no connected monitors to be started\n"
 
         for instance in self._instances:
             send_to(instance.socket_obj, START_MESSAGE)
-        return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}"
+        return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}\n"
 
 
 class InstancesCommand(Command):
-    def __init__(self, instances: List[Client]):
-        self._instances = instances
+    def __init__(self, daemons: List[str]):
+        self._daemons = daemons
 
     def execute(self) -> str:
-        os = list(filter(lambda x: x.name.startswith('OSMonitor'), self._instances))
-        docker = list(filter(lambda x: x.name.startswith('DockerMonitor'), self._instances))
-        process = list(filter(lambda x: x.name.startswith('ProcessMonitor'), self._instances))
+        message = ""
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            for addr in self._daemons:
+                message += f'Host: {addr}\n'
+                send_to(sockfd, "instances", (addr, DEFAULT_DAEMON_PORT))
+                data, _ = receive(sockfd)
+                message += data
         
-        message = f"Total connected instances: {len(self._instances)}\n"
-        message += f"\t- OSMonitor instances: {len(os)}\n"
-        message += f"\t- DockerMonitor instances: {len(docker)}\n"
-        message += f"\t- ProcessMonitor instances: {len(process)}\n"
+        if message == "":
+            message = "No instances connected yet."
+
         return message
 
-class ConnectedMonitorsCommand(Command):
+class ConnectedDaemonsCommand(Command):
     def __init__(self, instances: List[Client]):
         self._instances = instances
     
@@ -69,9 +72,9 @@ class ConnectedMonitorsCommand(Command):
         os = list(filter(lambda x: x.name.startswith('OSMonitor'), self._instances))
 
         # Parsing hostname and IP address
-        os = list(map(lambda x: f"Hostname: {x.name.split('_')[5]}\tIP: {'.'.join(i for i in x.name.split('_')[1:5])}", os))
+        os = list(map(lambda x: f"Hostname: {x.name.split('_')[5]} | IP: {'.'.join(i for i in x.name.split('_')[1:5])}", os))
 
-        message = f"Total OSMonitor instances: {len(os)}\n"
+        message = f"Total daemons connected: {len(os)}\n"
         
         if len(os):
             for monitor in os:
@@ -86,14 +89,14 @@ class StopCommand(Command):
     
     def execute(self) -> str:
         if not self._is_running:
-            return 'Unable to stop idling monitors'
-            
+            return 'Unable to stop idling monitors\n'
+        
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             for addr in self._daemon_addresses:
                 send_to(sockfd, 'stop', (addr, DEFAULT_DAEMON_PORT))
         
-        return f'Stopped {len(self._instances)} instances'
+        return f'Stopped {len(self._instances)} instances\n'
 
 class NotExistCommand(Command):
     def execute(self) -> str:
-        return "Command does not exist"
+        return "Command does not exist\n"

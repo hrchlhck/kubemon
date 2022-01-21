@@ -17,12 +17,13 @@ from . import (
 )
 
 from psutil import Process as psProcess
-from ..utils import get_containers
+from ..utils import get_containers, receive
 from docker import from_env
 from time import sleep as time_sleep
 
 import threading
 import socket
+import pickle
 import sys
 
 __all__ = ['Kubemond']
@@ -43,7 +44,7 @@ class Kubemond(threading.Thread):
             'start': self.start_modules,
             'stop': self.stop_modules,
             'running': self.running,
-            'list': self.list_instances,
+            'instances': self.list_instances,
             'n_monitors': self.num_monitors,
         }
         threading.Thread.__init__(self)
@@ -93,29 +94,26 @@ class Kubemond(threading.Thread):
  
     def listen_commands(self) -> None:
         print("Started listen_commands")
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             sockfd.bind(('0.0.0.0', DEFAULT_DAEMON_PORT))
             
             while True:
                 # Receive the data
-                data, addr = sockfd.recvfrom(1024)
-                
-                # Converting the data to string and removing \n
-                print(data)
-                data = data.decode('utf8')
+                data, addr = receive(sockfd)
 
                 # Splitting into (command, args)
                 cmd, *args = data.split()
                 cmd = cmd.lower()
 
-                print(f"Received from {addr}: {data} ({sys.getsizeof(data)} bytes)")
+                print(f"Received from {addr}: {data} ({sys.getsizeof(data)} bytes)", file=sys.stdout)
 
                 # Getting the function according to the received command
                 ret = self.__functions.get(cmd)
 
                 # If it exists, then execute it with the received arguments
                 if ret != None:
-                    if cmd == 'list' or cmd == 'running' or cmd == 'n_monitors':
+                    if cmd == 'instances' or cmd == 'running' or cmd == 'n_monitors':
                         ret(sockfd, addr)
                     else:
                         ret(*args)
@@ -124,13 +122,13 @@ class Kubemond(threading.Thread):
 
     def num_monitors(self, sockfd: socket.socket, addr: tuple) -> None:
         n_monitors = f'{len(self.monitors)}\n'
-        sockfd.sendto(n_monitors.encode(), addr)
+        send_to(sockfd, n_monitors, addr)
 
     def running(self, sockfd: socket.socket, addr: tuple) -> None:
         msg = 'Is running?: '
         msg += 'Yes' if self.is_running else 'No'
         msg += '\n'
-        sockfd.sendto(msg.encode(), addr)
+        send_to(sockfd, msg, addr)
 
     def list_instances(self, sockfd: socket.socket, addr: tuple) -> None:
         msg = ""
@@ -144,7 +142,7 @@ class Kubemond(threading.Thread):
             msg += klass + ' - ' + str(len(monitor_per_class[klass])) + '\n'
             msg += ', '.join([str(i) for i in instances])
             msg += '\n'
-        sockfd.sendto(msg.encode(), addr)
+        send_to(sockfd, msg, addr)
 
     def start_modules(self, directory: str, *args) -> Any:
         print("Called start_modules")

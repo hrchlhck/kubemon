@@ -1,7 +1,7 @@
 from typing import List
-from kubemon.collector.commands import ConnectedMonitorsCommand, InstancesCommand, NotExistCommand, StartCommand, StopCommand
+from kubemon.collector.commands import ConnectedDaemonsCommand, InstancesCommand, NotExistCommand, StartCommand, StopCommand
 from ..dataclasses import Client
-from ..config import DATA_PATH, DEFAULT_CLI_PORT
+from ..config import DATA_PATH, DEFAULT_CLI_PORT, DEFAULT_MONITOR_PORT
 from ..utils import save_csv, receive, send_to
 from addict import Dict
 from datetime import datetime
@@ -52,11 +52,13 @@ class Collector(threading.Thread):
     
     @property
     def daemons(self) -> List[str]:
+        get_raddr = lambda x: x.socket_obj.getsockname()[0] if x.socket_obj.getsockname()[1] != DEFAULT_MONITOR_PORT else x.socket_obj.getpeername()
         unique = []
 
         for client in self.__instances:
-            if client.address[0] not in unique:
-                unique.append(client.address[0])
+            addr = get_raddr(client)
+            if addr[0] not in unique:
+                unique.append(addr[0])
 
         return unique
 
@@ -96,10 +98,12 @@ class Collector(threading.Thread):
         while True:
             data, addr = receive(cli)
 
+            # Splitting from 'command args' -> [command, args]
+            data = data.split()
+
             LOGGER.info(f"Received command '{data}' from {addr[0]}:{addr[1]}")
 
-            if data:
-                print(data)
+            if data:              
                 cmd = data[0].lower() # Command
 
                 if cmd == "start":
@@ -109,12 +113,12 @@ class Collector(threading.Thread):
                     command = StartCommand(self.__instances, self.dir_name, self.address)
                     self.is_running = True
                 elif cmd == "instances":
-                    command = InstancesCommand(self.__instances)
-                elif cmd == "monitors":
-                    command = ConnectedMonitorsCommand(self.__instances)
+                    command = InstancesCommand(self.daemons)
+                elif cmd == "daemons":
+                    command = ConnectedDaemonsCommand(self.__instances)
                 elif cmd == "stop":
-                    self.is_running = False
                     command = StopCommand(self.__instances, self.daemons, self.is_running)
+                    self.is_running = False
                 else:
                     command = NotExistCommand()           
 
@@ -135,7 +139,7 @@ class Collector(threading.Thread):
             sockfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sockfd.bind((address, port))
         except:
-            self.error(f"Error while trying to bind socket to port {port}")
+            LOGGER.error(f"Error while trying to bind socket to port {port}")
             sockfd.close()
             exit(1)
         return sockfd
