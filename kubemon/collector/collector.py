@@ -1,5 +1,5 @@
 from typing import List
-from kubemon.collector.commands import ConnectedDaemonsCommand, InstancesCommand, NotExistCommand, StartCommand, StopCommand
+from kubemon.collector.commands import COMMAND_CLASSES
 from ..dataclasses import Client
 from ..config import DATA_PATH, DEFAULT_CLI_PORT, DEFAULT_MONITOR_PORT
 from ..utils import save_csv, receive, send_to
@@ -110,17 +110,19 @@ class Collector(threading.Thread):
                     if len(data) == 2:
                         self.dir_name = data[1]
                         LOGGER.debug(f"dir_name setted to {self.dir_name}")
-                    command = StartCommand(self.__instances, self.dir_name, self.address)
+                    cmd_args = (self.__instances, self.dir_name, self.address)
                     self.is_running = True
                 elif cmd == "instances":
-                    command = InstancesCommand(self.daemons)
+                    cmd_args = (self.daemons,)
                 elif cmd == "daemons":
-                    command = ConnectedDaemonsCommand(self.__instances)
+                    cmd_args = (self.__instances,)
                 elif cmd == "stop":
-                    command = StopCommand(self.__instances, self.daemons, self.is_running)
+                    cmd_args = (self.__instances, self.daemons, self.is_running) 
                     self.is_running = False
                 else:
-                    command = NotExistCommand()           
+                    cmd_args = tuple()
+
+                command = COMMAND_CLASSES[cmd](*cmd_args)
 
                 message = command.execute()
                 send_to(cli, message, address=addr)

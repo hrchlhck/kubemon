@@ -139,8 +139,8 @@ class Kubemond(threading.Thread):
         }
 
         for klass, instances in monitor_per_class.items():
-            msg += klass + ' - ' + str(len(monitor_per_class[klass])) + '\n'
-            msg += ', '.join([str(i) for i in instances])
+            msg += klass + ' - ' + str(len(monitor_per_class[klass])) + '\n\t'
+            msg += '\n\t'.join([str(i) for i in instances]) + '\n'
             msg += '\n'
         send_to(sockfd, msg, addr)
 

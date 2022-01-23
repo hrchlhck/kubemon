@@ -1,7 +1,12 @@
 from ..dataclasses import Client
 from typing import List
 from kubemon.utils import receive, send_to
-from kubemon.config import DATA_PATH, START_MESSAGE, DEFAULT_DAEMON_PORT
+
+from kubemon.config import (
+    DATA_PATH, 
+    START_MESSAGE, 
+    DEFAULT_DAEMON_PORT
+)
 
 import dataclasses
 import socket
@@ -13,15 +18,15 @@ __all__ = [
     'NotExistCommand', 
     'StartCommand', 
     'InstancesCommand', 
-    'ConnectedMonitorsCommand',
+    'ConnectedDaemonsCommand',
     'StopCommand',
 ]
 
 COMMANDS = {
     'StartCommand': 'start <output_dir>', 
     'InstancesCommand': 'instances',
-    'ConnectedMonitorsCommand': 'monitors',
-    'StopCommand': 'stop'
+    'ConnectedDaemonsCommand': 'daemons',
+    'StopCommand': 'stop',
 }
 
 @dataclasses.dataclass
@@ -53,7 +58,7 @@ class InstancesCommand(Command):
         message = ""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             for addr in self._daemons:
-                message += f'Host: {addr}\n'
+                message += f'Host: {addr}\n\n'
                 send_to(sockfd, "instances", (addr, DEFAULT_DAEMON_PORT))
                 data, _ = receive(sockfd)
                 message += data
@@ -100,3 +105,11 @@ class StopCommand(Command):
 class NotExistCommand(Command):
     def execute(self) -> str:
         return "Command does not exist\n"
+
+COMMAND_CLASSES = {
+    'start': StartCommand,
+    'instances': InstancesCommand,
+    'daemons': ConnectedDaemonsCommand,
+    'stop': StopCommand,
+    'not exist': NotExistCommand,
+}
