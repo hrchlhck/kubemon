@@ -24,3 +24,9 @@ stop_collector:
 
 daemon:
 	sudo -b su -c "venv/bin/python -m kubemon -t daemon -H $(host) > /dev/null 2>&1 &"
+
+kill_daemon:
+	sudo kill -9 $(shell ps aux | grep -E '(venv/bin/python -m kubemon -t daemon -H)' | awk {'print $$2'})
+
+cli:
+	sudo venv/bin/python -m kubemon -t cli -H $(host)
