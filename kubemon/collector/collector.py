@@ -157,22 +157,22 @@ class Collector(threading.Thread):
         """ Wrapper function to setup CLI. """
         
         # Setup socket
-        sockfd = self.__setup_socket(self.address, self.cli_port, socket.SOCK_DGRAM)
-        LOGGER.info(f'Started collector CLI at {self.address}:{self.cli_port}')
+        with self.__setup_socket(self.address, self.cli_port, socket.SOCK_DGRAM) as sockfd:
+            LOGGER.info(f'Started collector CLI at {self.address}:{self.cli_port}')
 
-        # Start listening for commands
-        self.__listen_cli(sockfd)
+            # Start listening for commands
+            self.__listen_cli(sockfd)
 
     def __start_collector(self) -> None:
         """ Wrapper function to setup the collector. """
 
         # Setup socket
-        sockfd = self.__setup_socket(self.address, self.port, socket.SOCK_STREAM)
-        sockfd.listen()
-        LOGGER.info(f"Started collector at {self.address}:{self.port}")
+        with self.__setup_socket(self.address, self.port, socket.SOCK_STREAM) as sockfd:
+            sockfd.listen()
+            LOGGER.info(f"Started collector at {self.address}:{self.port}")
 
-        # Start accepting incoming connections from monitors
-        self.__accept_connections(sockfd)
+            # Start accepting incoming connections from monitors
+            self.__accept_connections(sockfd)
     
     def run(self) -> None:
         """ Start the collector """
