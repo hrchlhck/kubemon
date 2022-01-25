@@ -8,5 +8,10 @@ setup(
     author='Pedro (vpemfh7) Horchulhack',
     author_email='pedro.horchulhack@ppgia.pucpr.br',
     license='MIT',
+    packages=[
+        'kubemon', 'kubemon.collector',
+        'kubemon.cli', 'kubemon.monitors',
+        'kubemon.exceptions', 'kubemon.entities'
+    ],
     install_requires=['wheel', 'pandas', 'requests', 'psutil', 'docker', 'addict', 'sty']
 )
