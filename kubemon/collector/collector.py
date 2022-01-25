@@ -68,7 +68,7 @@ class Collector(threading.Thread):
             client, address = sockfd.accept()
 
             # Receiving the monitor name
-            name, _ = receive(client, buffer_size=512)
+            name, _ = receive(client)
 
             LOGGER.debug(f"Received name={name}")
 
@@ -193,7 +193,7 @@ class Collector(threading.Thread):
 
         while True:
             try:
-                data, _ = receive(client.socket_obj, buffer_size=2048)
+                data, _ = receive(client.socket_obj)
                 
                 if data != None:
                     LOGGER.info(f"Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}")

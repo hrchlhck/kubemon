@@ -8,10 +8,12 @@ from .config import DATA_PATH
 from .decorators import wrap_exceptions
 from .dataclasses import Pair
 from time import sleep
+
 import docker
 import socket
 import csv
 import pickle
+import struct
 import json
 
 __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data',
@@ -177,20 +179,23 @@ def try_connect(addr: str, port: int, _socket: socket.socket, timeout: int) -> N
     exit(0)
 
 
-def receive(_socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> str:
+def receive(_socket: socket.socket, encoding_type='utf8') -> str:
     """ 
     Wrapper function for receiving data from a socket. It also decodes it to utf8 by default.
 
     Args:
         _socket (socket): Socket that will be receiving data from;
-        buffer_size (int): Size of the buffer used by socket.recv() method;
         encoding_type (str): Encoding type for decoding incoming data.
     """
     # UDP
     addr = None
     if _socket.type == 2:
+        recv_size, _ = _socket.recvfrom(4)
+        buffer_size = struct.unpack('I', recv_size)[0]
         data, addr = _socket.recvfrom(buffer_size)
     else:
+        recv_size = _socket.recv(4)
+        buffer_size = struct.unpack('I', recv_size)[0]
         data = _socket.recv(buffer_size)
 
     data = pickle.loads(data, encoding=encoding_type)
@@ -199,11 +204,16 @@ def receive(_socket: socket.socket, buffer_size=1024, encoding_type='utf8') -> s
 
 @wrap_exceptions(KeyboardInterrupt)
 def send_to(_socket: socket.socket, data: object, address=tuple()) -> None:
+    byte_data = pickle.dumps(data)
+    size = struct.pack('I', len(byte_data))
+
     # UDP
     if _socket.type == 2 and address:
-        _socket.sendto(pickle.dumps(data), address)
+        _socket.sendto(size, address)
+        _socket.sendto(byte_data, address)
     else:
-        _socket.send(pickle.dumps(data))
+        _socket.send(size)
+        _socket.send(byte_data)
 
 def get_default_nic():
     """ Function to get the default network interface in a Linux-based system. """
