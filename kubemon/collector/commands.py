@@ -1,5 +1,5 @@
 from ..dataclasses import Client
-from typing import List
+from typing import Dict, List
 from kubemon.utils import receive, send_to
 
 from kubemon.config import (
@@ -20,6 +20,7 @@ __all__ = [
     'InstancesCommand', 
     'ConnectedDaemonsCommand',
     'StopCommand',
+    'HelpCommand'
 ]
 
 COMMANDS = {
@@ -36,6 +37,12 @@ class Command(abc.ABC):
         pass
 
 class StartCommand(Command):
+    """ Start collecting metrics from all connected daemons in the collector.
+
+    Args:
+        - Directory name to be saving the data collected. Ex.: start test000
+    """
+
     def __init__(self, instances: List[Client], dir_name: str, addr: str):
         self._instances = instances
         self._dir_name = dir_name
@@ -51,6 +58,9 @@ class StartCommand(Command):
 
 
 class InstancesCommand(Command):
+    """ Lists all the connected monitor instances.
+    """
+
     def __init__(self, daemons: List[str]):
         self._daemons = daemons
 
@@ -69,6 +79,9 @@ class InstancesCommand(Command):
         return message
 
 class ConnectedDaemonsCommand(Command):
+    """ Lists all the daemons (hosts) connected.
+    """
+
     def __init__(self, instances: List[Client]):
         self._instances = instances
     
@@ -87,6 +100,9 @@ class ConnectedDaemonsCommand(Command):
         return message
 
 class StopCommand(Command):
+    """ Stop all monitors if they're running.
+    """
+
     def __init__(self, instances: List[Client], daemon_addresses: List[str], is_running: bool):
         self._instances = instances
         self._daemon_addresses = daemon_addresses
@@ -103,8 +119,26 @@ class StopCommand(Command):
         return f'Stopped {len(self._instances)} instances\n'
 
 class NotExistCommand(Command):
+    """ Indicates if a command does not exist. 
+    """
+
     def execute(self) -> str:
         return "Command does not exist\n"
+
+class HelpCommand(Command):
+    """ Lists all the available commands.
+    """
+    def __init__(self, command_dict: Dict[str, Command]):
+        self._cmd_dict = command_dict
+    
+    def execute(self) -> str:
+        msg = ""
+
+        for key, value in self._cmd_dict.items():
+            msg += f'\'{key}\':'
+            msg += value.__doc__ + '\n'
+        
+        return msg
 
 COMMAND_CLASSES = {
     'start': StartCommand,
@@ -112,4 +146,5 @@ COMMAND_CLASSES = {
     'daemons': ConnectedDaemonsCommand,
     'stop': StopCommand,
     'not exist': NotExistCommand,
+    'help': HelpCommand,
 }
