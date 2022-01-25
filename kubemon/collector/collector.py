@@ -119,12 +119,19 @@ class Collector(threading.Thread):
                 elif cmd == "stop":
                     cmd_args = (self.__instances, self.daemons, self.is_running) 
                     self.is_running = False
+                elif cmd == "help":
+                    cmd_args = (COMMAND_CLASSES,)
                 else:
                     cmd_args = tuple()
 
-                command = COMMAND_CLASSES[cmd](*cmd_args)
+                command = COMMAND_CLASSES.get(cmd)
 
+                if command == None:
+                    command = COMMAND_CLASSES['not exist']
+
+                command = command(*cmd_args)
                 message = command.execute()
+
                 send_to(cli, message, address=addr)
                 LOGGER.debug(f"Sending '{message}' to {addr[0]}:{addr[1]}")
 
