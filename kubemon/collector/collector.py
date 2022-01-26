@@ -1,14 +1,24 @@
-from typing import List
 from kubemon.collector.commands import COMMAND_CLASSES
+
+from ..config import (
+    DATA_PATH, DEFAULT_CLI_PORT,
+    DEFAULT_MONITOR_PORT
+)
+
 from ..dataclasses import Client
-from ..config import DATA_PATH, DEFAULT_CLI_PORT, DEFAULT_MONITOR_PORT
-from ..utils import save_csv, receive, send_to
+from ..utils import (
+    save_csv, receive, send_to
+)
+from typing import List
+
+from os.path import join as join_path
 from addict import Dict
 from datetime import datetime
-from os.path import join as join_path
+
+from ..log import create_logger
+
 import socket
 import threading
-from ..log import create_logger
 
 def start_thread(func, args=tuple()):
     """
@@ -110,9 +120,9 @@ class Collector(threading.Thread):
                     if len(data) == 2:
                         self.dir_name = data[1]
                         LOGGER.debug(f"dir_name setted to {self.dir_name}")
-                    cmd_args = (self.__instances, self.dir_name, self.address)
+                    cmd_args = (self.__instances, self.daemons, self.dir_name, self.address)
                     self.is_running = True
-                elif cmd == "instances":
+                elif cmd == "instances" or cmd == "is_running":
                     cmd_args = (self.daemons,)
                 elif cmd == "daemons":
                     cmd_args = (self.__instances,)

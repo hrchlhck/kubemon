@@ -43,10 +43,11 @@ class StartCommand(Command):
         - Directory name to be saving the data collected. Ex.: start test000
     """
 
-    def __init__(self, instances: List[Client], dir_name: str, addr: str):
+    def __init__(self, instances: List[Client], daemons: List[str], dir_name: str, addr: str):
         self._instances = instances
         self._dir_name = dir_name
         self._monitor_addr = addr
+        self._daemons = daemons
 
     def execute(self) -> str:
         if not len(self._instances):
@@ -54,6 +55,11 @@ class StartCommand(Command):
 
         for instance in self._instances:
             send_to(instance.socket_obj, START_MESSAGE)
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            for daddr in self._daemons:
+                send_to(sockfd, 'start', (daddr, DEFAULT_DAEMON_PORT))
+
         return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}\n"
 
 
@@ -140,6 +146,24 @@ class HelpCommand(Command):
         
         return msg
 
+class IsRunningCommand(Command):
+    """ Tells if the monitors are running.
+    """
+
+    def __init__(self, daemons: List[str]):
+        self._daemons = daemons
+    
+    def execute(self) -> str:
+        
+        msg = ""
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            for addr in self._daemons:
+                send_to(sockfd, 'running', (addr, DEFAULT_DAEMON_PORT))
+                data, _ = receive(sockfd)
+                msg += addr + " - " + data
+
+        return msg + '\n'
+
 COMMAND_CLASSES = {
     'start': StartCommand,
     'instances': InstancesCommand,
@@ -147,4 +171,5 @@ COMMAND_CLASSES = {
     'stop': StopCommand,
     'not exist': NotExistCommand,
     'help': HelpCommand,
+    'is_running': IsRunningCommand,
 }
