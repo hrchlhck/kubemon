@@ -5,7 +5,7 @@ from kubemon.monitors.base_monitor import BaseMonitor, MonitorFlag
 from typing import Any, List, Tuple
 
 from ..config import (
-    DEFAULT_CLI_PORT, DEFAULT_MONITOR_INTERVAL, 
+    DEFAULT_MONITOR_INTERVAL, 
     DEFAULT_MONITOR_PORT, DEFAULT_DAEMON_PORT,
     MONITOR_PROBE_INTERVAL
 )
@@ -23,7 +23,6 @@ from time import sleep as time_sleep
 
 import threading
 import socket
-import pickle
 import sys
 
 __all__ = ['Kubemond']
@@ -144,20 +143,9 @@ class Kubemond(threading.Thread):
             msg += '\n'
         send_to(sockfd, msg, addr)
 
-    def start_modules(self, directory: str, *args) -> Any:
+    def start_modules(self, *args) -> Any:
         print("Called start_modules")
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            send_to(sockfd, ["start", directory], (self.address, DEFAULT_CLI_PORT))
-            self.__directory = directory
-
-            data, _ = receive(sockfd)
-
-            self.is_running = True
-
-            if data is not None:
-                print(f"Received {sys.getsizeof(data)} bytes")
-
-            return data
+        self.is_running = True
 
     def stop_modules(self, *args) -> None:
         print("Called stop_modules")
@@ -179,6 +167,7 @@ class Kubemond(threading.Thread):
 
     def probe_new_instances(self) -> None:
         args = self.address, self.port, self.interval
+
         while True:
             time_sleep(self.probe_interval)
             instances = docker_instances(*args) + process_instances(*args)
@@ -189,16 +178,8 @@ class Kubemond(threading.Thread):
                 self.monitors += new_instances
 
                 for monitor in new_instances:
-                    if monitor.flag == MonitorFlag.NOT_CONNECTED:
+                    if monitor.flag == MonitorFlag.NOT_CONNECTED and not monitor.is_alive():
                         monitor.start()
-                    
-                    if self.is_running:
-                        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-                            send_to(sockfd, ["start", self.directory], (self.address, DEFAULT_CLI_PORT))
-                            data, _ = receive(sockfd)
-                            
-                            if data is not None:
-                                print(f"Received {sys.getsizeof(data)} bytes")
 
     def run(self) -> None:
         self.__init_monitors()
