@@ -2,7 +2,12 @@ from threading import Thread
 
 from docker.models.containers import Container
 from kubemon.config import DEFAULT_DISK_PARTITION
-from ..utils import subtract_dicts, filter_dict, get_container_pid
+
+from kubemon.utils import (
+    subtract_dicts, filter_dict, 
+    get_container_pid, get_host_ip
+)
+
 from .base_monitor import BaseMonitor
 from .process_monitor import ProcessMonitor
 from ..log import create_logger
@@ -10,6 +15,8 @@ from ..entities.disk import Disk
 from ..pod import *
 from time import sleep
 from typing import List
+
+import socket
 
 __all__ = ['DockerMonitor']
 
@@ -115,6 +122,9 @@ class DockerMonitor(BaseMonitor, Thread):
     @property
     def pod(self) -> Pod:
         return self.__pod
+    
+    def __str__(self) -> str:
+        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.pid}>'
 
     def get_path(self, cgroup_controller: str, stat: str, container: Pair=None, pod: Pod=None) -> str:
         """ 
