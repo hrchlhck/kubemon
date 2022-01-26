@@ -23,7 +23,7 @@ stop_collector:
 	docker kill $(shell docker ps | grep collector | awk '{print $$1}')
 
 daemon:
-	sudo -b su -c "venv/bin/python -m kubemon -t daemon -H $(host) > /dev/null 2>&1 &"
+	sudo -b su -c "venv/bin/python -m kubemon -t daemon -H $(host) >> daemon.out 2>&1 &"
 
 kill_daemon:
 	sudo kill -9 $(shell ps aux | grep -E '(venv/bin/python -m kubemon -t daemon -H)' | awk {'print $$2'})
