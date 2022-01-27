@@ -5,7 +5,7 @@ from kubemon.config import LOGGING_LEVEL
 from .exceptions.platform_exception import NotLinuxException
 from .cli import *
 from .merge import merge
-from .collector.commands import COMMANDS
+from .collector.commands import COMMAND_CLASSES
 
 import sys
 
@@ -42,5 +42,5 @@ if __name__ == "__main__":
     if args.list_commands:
         print("Available commands:")
         LOGGER.debug("Listing commands")
-        for cmd in COMMANDS:
-            print(f"- {COMMANDS[cmd]}")
+        cmd = COMMAND_CLASSES.get('help')(COMMAND_CLASSES)
+        print(cmd.execute())
