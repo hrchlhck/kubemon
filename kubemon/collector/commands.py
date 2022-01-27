@@ -1,6 +1,6 @@
 from ..dataclasses import Client
 from typing import Dict, List
-from kubemon.utils import receive, send_to
+from kubemon.utils import receive, send_to, is_alive
 
 from kubemon.config import (
     DATA_PATH, 
@@ -115,8 +115,8 @@ class StopCommand(Command):
         self._is_running = is_running
     
     def execute(self) -> str:
-        if not self._is_running:
-            return 'Unable to stop idling monitors\n'
+        # if not self._is_running:
+        #     return 'Unable to stop idling monitors\n'
         
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             for addr in self._daemon_addresses:
@@ -150,12 +150,13 @@ class IsRunningCommand(Command):
     """ Tells if the monitors are running.
     """
 
-    def __init__(self, daemons: List[str]):
+    def __init__(self, daemons: List[str], since: str):
         self._daemons = daemons
+        self._since = since
     
     def execute(self) -> str:
         
-        msg = ""
+        msg = f"Running since: {str(self._since)}\n"
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             for addr in self._daemons:
                 send_to(sockfd, 'running', (addr, DEFAULT_DAEMON_PORT))
@@ -163,6 +164,25 @@ class IsRunningCommand(Command):
                 msg += addr + " - " + data
 
         return msg + '\n'
+
+class IsAliveCommand(Command):
+    """ Tells if the collector is alive.
+    """
+    def __init__(self, address: str, port: int):
+        self._addr = address
+        self._port = port
+
+    def execute(self) -> str:
+        alive, sockfd = is_alive(self._addr, self._port)
+
+        msg = 'Collector is offline.'
+
+        if alive and sockfd:
+            print('Ping')
+            msg, _ = receive(sockfd)
+            sockfd.close()
+
+        return msg
 
 COMMAND_CLASSES = {
     'start': StartCommand,
@@ -172,4 +192,5 @@ COMMAND_CLASSES = {
     'not exist': NotExistCommand,
     'help': HelpCommand,
     'is_running': IsRunningCommand,
+    'is_alive': IsAliveCommand,
 }

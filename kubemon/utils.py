@@ -243,3 +243,13 @@ def get_host_ip():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
         sockfd.connect(('8.8.8.8', 80))
         return sockfd.getsockname()[0]
+
+def is_alive(address: str, port: int) -> bool:
+    sockfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    try:
+        sockfd.connect((address, port))
+        return True, sockfd
+    except:
+        sockfd.close()
+        return False, None

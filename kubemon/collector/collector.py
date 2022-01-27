@@ -1,8 +1,10 @@
+from time import sleep
 from kubemon.collector.commands import COMMAND_CLASSES
 
 from ..config import (
     DATA_PATH, DEFAULT_CLI_PORT,
-    DEFAULT_MONITOR_PORT
+    DEFAULT_MONITOR_PORT, 
+    COLLECTOR_HEALTH_CHECK_PORT
 )
 
 from ..dataclasses import Client
@@ -43,6 +45,7 @@ class Collector(threading.Thread):
         self.is_running = False
         self.name = self.__class__.__name__
         self.mutex = threading.Lock()
+        self.__running_since = None
 
     @property
     def address(self):
@@ -71,6 +74,14 @@ class Collector(threading.Thread):
                 unique.append(addr[0])
 
         return unique
+
+    @property
+    def running_since(self) -> str:
+        return self.__running_since
+    
+    @running_since.setter
+    def running_since(self, val: datetime) -> None:
+        self.__running_since = val
 
     def __accept_connections(self, sockfd: socket.socket) -> None:
         LOGGER.debug("Started function __accept_connections")
@@ -122,12 +133,16 @@ class Collector(threading.Thread):
                         LOGGER.debug(f"dir_name setted to {self.dir_name}")
                     cmd_args = (self.__instances, self.daemons, self.dir_name, self.address)
                     self.is_running = True
-                elif cmd == "instances" or cmd == "is_running":
+                    self.running_since = datetime.now()
+                elif cmd == "instances":
                     cmd_args = (self.daemons,)
+                elif cmd == "is_running":
+                    cmd_args = (self.daemons, self.running_since)
                 elif cmd == "daemons":
                     cmd_args = (self.__instances,)
                 elif cmd == "stop":
                     cmd_args = (self.__instances, self.daemons, self.is_running) 
+                    self.running_since = None
                     self.is_running = False
                 elif cmd == "help":
                     cmd_args = (COMMAND_CLASSES,)
@@ -187,8 +202,23 @@ class Collector(threading.Thread):
     def run(self) -> None:
         """ Start the collector """
         start_thread(self.__start_cli)
+        start_thread(self.__is_alive)
         self.__start_collector()
         LOGGER.debug("Call from function start")
+
+    def __is_alive(self) -> None:
+        with self.__setup_socket(self.address, COLLECTOR_HEALTH_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
+            sockfd.listen(2)
+
+            while True:
+                conn, _ = sockfd.accept()
+
+                send_to(conn, 'Pong!')
+
+                sleep(1)
+
+                conn.close()
+
 
     def __listen_monitors(self, client: Client) -> None:
         """ Listen for monitors. 

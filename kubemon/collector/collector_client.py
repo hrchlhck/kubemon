@@ -1,4 +1,7 @@
-from ..utils import receive, send_to
+from kubemon.collector.commands import IsAliveCommand
+from kubemon.utils import receive, send_to
+from kubemon.config import COLLECTOR_HEALTH_CHECK_PORT
+
 import threading
 import socket
 import sys
@@ -35,6 +38,10 @@ class CollectorClient(threading.Thread):
                 if cmd == "exit":
                     print("Exiting CLI")
                     sys.exit(1)
+                elif cmd == "is_alive":
+                    data = IsAliveCommand(self.address, COLLECTOR_HEALTH_CHECK_PORT).execute()
+                    print(data)
+                    continue
 
                 send_to(sockfd, cmd, (self.address, self.port))
 
