@@ -1,13 +1,18 @@
 from threading import Thread
 
 from docker.models.containers import Container
-from ..utils import subtract_dicts, get_host_ip
+
+from ..utils import subtract_dicts, get_host_ip, get_default_nic
 from .base_monitor import BaseMonitor
 from ..log import create_logger
+
 import psutil
 import os
 import socket
+import re
 
+def to_digit(x: str) -> object:
+    return int(x) if x.isdigit() else x
 
 def parse_proc_net(pid):
     # Assert if pid exists in /proc
@@ -16,24 +21,37 @@ def parse_proc_net(pid):
     def to_dict(cols, vals):
         return {k: v for k, v in zip(cols, vals)}
 
-    fd = "/proc/%s/net/dev" % pid
-    with open(fd, mode='r') as f:
-        lines = f.readlines()
+    fd = f"/proc/{pid}/net/dev"
+    with open(fd, mode='r') as fd:
+        lines = list(fd)
 
-        # Parse column names
-        cols = list(map(lambda x: x.split(), lines[1].split('|')))
+        # Removing trailing whitespaces
+        lines = list(map(lambda x: re.split(r'\W+', x), lines))
+        
+        for i, line in enumerate(lines):
+            # Removing empty strings
+            line = list(filter(None, line))
+
+            # Converting to int
+            lines[i] = list(map(to_digit, line))
+
         shift_factor = 9
+        header = lines[1]
+        
+        # Labeling fields as tx or rx
+        header[0] = 'iface'
+        for i, field in enumerate(header[1:]):
+            i = i + 1
+            # shift_factor - 1 because its ignoring the 'face' field
+            if i > shift_factor - 1:
+                field = 'tx_' + field
+            else:
+                field = 'rx_' + field
+            header[i] = field
 
+        # Converting to dict
         for line in lines[2:]:
-            # Parsed values
-            aux = list(
-                map(lambda x: int(x) if x.isdigit() else x, line.split()))
-
-            iface = aux[0].replace(':', '')
-            rx = to_dict(cols[1], aux[1:shift_factor])
-            tx = to_dict(cols[2], aux[shift_factor:])
-            ret = {'iface': iface, 'rx': rx, 'tx': tx}
-            yield ret
+            yield to_dict(header, line)
 
 LOGGER = create_logger(__name__)
 
@@ -96,28 +114,28 @@ class ProcessMonitor(BaseMonitor, Thread):
         return ret
 
     @staticmethod
-    def get_net_usage(pid: int, iface='eno0') -> dict:
+    def get_net_usage(pid: int) -> dict:
         """ 
         Returns the network usage by a process 
 
         Args:
             pid (int): The pid of the process
-            iface (str): The network interface that you want to get the usage
         """
-        # Network interface
-        nic = [nic for nic in parse_proc_net(pid) if nic['iface'] == iface]
+
+        nic = [nic for nic in parse_proc_net(pid) if nic['iface'] == get_default_nic()]
         
         if len(nic) == 0:
-            return {'rx_bytes': 0, 'rx_packets': 0, 'tx_bytes': 0, 'tx_packets': 0}
+            ret = {
+                'iface': 'any', 'rx_bytes': 0, 'rx_packets': 0, 'rx_errs': 0, 
+                'rx_drop': 0, 'rx_fifo': 0, 'rx_frame': 0, 'rx_compressed': 0, 
+                'rx_multicast': 0, 'tx_bytes': 0, 'tx_packets': 0, 'tx_errs': 0, 
+                'tx_drop': 0, 'tx_fifo': 0, 'tx_colls': 0, 'tx_carrier': 0, 
+                'tx_compressed': 0
+            }
+        else:
+            ret = nic[0]
 
-        nic = nic[0]
-        
-        ret = dict()
-        ret['rx_bytes'] = nic['rx']['bytes']
-        ret['rx_packets'] = nic['rx']['packets']
-        ret['tx_bytes'] = nic['tx']['bytes']
-        ret['tx_packets'] = nic['tx']['packets']
-
+        ret.pop('iface')
         return ret
 
     @classmethod
