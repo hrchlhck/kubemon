@@ -1,23 +1,21 @@
-from time import sleep
-from kubemon.collector.commands import COMMAND_CLASSES
+from kubemon.collector.commands import COMMAND_CLASSES, HelpCommand
+from kubemon.dataclasses import Client
+from kubemon.log import create_logger
 
-from ..config import (
+from kubemon.config import (
     DATA_PATH, DEFAULT_CLI_PORT,
     DEFAULT_MONITOR_PORT, 
     COLLECTOR_HEALTH_CHECK_PORT
 )
-
-from ..dataclasses import Client
-from ..utils import (
+from kubemon.utils import (
     save_csv, receive, send_to
 )
-from typing import List
 
+from typing import List
+from time import sleep
 from os.path import join as join_path
 from addict import Dict
 from datetime import datetime
-
-from ..log import create_logger
 
 import socket
 import threading
@@ -46,21 +44,30 @@ class Collector(threading.Thread):
         self.name = self.__class__.__name__
         self.mutex = threading.Lock()
         self.__running_since = None
+        self.logger = LOGGER
 
     @property
-    def address(self):
+    def address(self) -> str:
         return self.__address
 
     @property
-    def port(self):
+    def port(self) -> int:
         return self.__port
     
     @property
-    def cli_port(self):
+    def cli_port(self) -> int:
         return self.__cli_port
        
     @property
-    def connected_instances(self):
+    def instances(self) -> List[Client]:
+        return self.__instances
+    
+    @instances.setter
+    def instances(self, val: list) -> None:
+        self.__instances = val
+
+    @property
+    def connected_instances(self) -> int:
         return len(self.__instances)
     
     @property
@@ -84,14 +91,14 @@ class Collector(threading.Thread):
         self.__running_since = val
 
     def __accept_connections(self, sockfd: socket.socket) -> None:
-        LOGGER.debug("Started function __accept_connections")
+        self.logger.debug("Started function __accept_connections")
         while True:
             client, address = sockfd.accept()
 
             # Receiving the monitor name
             name, _ = receive(client)
 
-            LOGGER.debug(f"Received name={name}")
+            self.logger.debug(f"Received name={name}")
 
             client = Client(name, client, client.getsockname())
 
@@ -99,7 +106,7 @@ class Collector(threading.Thread):
             self.__instances.append(client)
             self.mutex.release()
 
-            LOGGER.info(f"{name} connected. Address={address[0]}:{address[1]}")
+            self.logger.info(f"{name} connected. Address={address[0]}:{address[1]}")
 
             start_thread(self.__listen_monitors, (client,))
 
@@ -122,52 +129,31 @@ class Collector(threading.Thread):
             # Splitting from 'command args' -> [command, args]
             data = data.split()
 
-            LOGGER.info(f"Received command '{data}' from {addr[0]}:{addr[1]}")
+            self.logger.info(f"Received command '{data}' from {addr[0]}:{addr[1]}")
 
+            message = ""
             if data:              
-                cmd = data[0].lower() # Command
-
-                if cmd == "start":
-                    if len(data) == 2:
-                        self.dir_name = data[1]
-                        LOGGER.debug(f"dir_name setted to {self.dir_name}")
-                    cmd_args = (self.__instances, self.daemons, self.dir_name, self.address)
-                    self.is_running = True
-                    self.running_since = datetime.now()
-                elif cmd == "instances":
-                    cmd_args = (self.daemons,)
-                    LOGGER.debug('Total instances connected: ' + str(self.connected_instances))
-                elif cmd == 'restart':
-                    cmd_args = (self.daemons,)
-
-                    for i in self.__instances:
-                        LOGGER.debug(f'Closing connection of {i.name}')
-                        i.socket_obj.close()
-
-                    self.__instances = list()
-                elif cmd == "is_running":
-                    cmd_args = (self.daemons, self.running_since)
-                elif cmd == "daemons":
-                    cmd_args = (self.__instances,)
-                elif cmd == "stop":
-                    cmd_args = (self.__instances, self.daemons, self.is_running) 
-                    self.running_since = None
-                    self.is_running = False
-                elif cmd == "help":
-                    cmd_args = (COMMAND_CLASSES,)
-                else:
-                    cmd_args = tuple()
+                cmd = data[0].lower() # Command                      
 
                 command = COMMAND_CLASSES.get(cmd)
 
-                if command == None:
+                if not command:
                     command = COMMAND_CLASSES['not exist']
 
-                command = command(*cmd_args)
+                command = command(self)
+
+                if cmd == 'help':
+                    command = HelpCommand(COMMAND_CLASSES)
+                elif cmd == 'start':
+                    if len(data) >= 2:
+                        self.dir_name = data[1]
+                        self.logger.debug(f"dir_name set to {self.dir_name}")
+
                 message = command.execute()
 
-                send_to(cli, message, address=addr)
-                LOGGER.debug(f"Sending '{message}' to {addr[0]}:{addr[1]}")
+            send_to(cli, message, address=addr)
+
+            self.logger.debug(f"Sending '{message}' to {addr[0]}:{addr[1]}")
 
     def __setup_socket(self, address: str, port: int, socktype: socket.SocketKind) -> socket.socket:
         """ 
@@ -182,7 +168,7 @@ class Collector(threading.Thread):
             sockfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sockfd.bind((address, port))
         except:
-            LOGGER.error(f"Error while trying to bind socket to port {port}")
+            self.logger.error(f"Error while trying to bind socket to port {port}")
             sockfd.close()
             exit(1)
         return sockfd
@@ -192,7 +178,7 @@ class Collector(threading.Thread):
         
         # Setup socket
         with self.__setup_socket(self.address, self.cli_port, socket.SOCK_DGRAM) as sockfd:
-            LOGGER.info(f'Started collector CLI at {self.address}:{self.cli_port}')
+            self.logger.info(f'Started collector CLI at {self.address}:{self.cli_port}')
 
             # Start listening for commands
             self.__listen_cli(sockfd)
@@ -203,7 +189,7 @@ class Collector(threading.Thread):
         # Setup socket
         with self.__setup_socket(self.address, self.port, socket.SOCK_STREAM) as sockfd:
             sockfd.listen()
-            LOGGER.info(f"Started collector at {self.address}:{self.port}")
+            self.logger.info(f"Started collector at {self.address}:{self.port}")
 
             # Start accepting incoming connections from monitors
             self.__accept_connections(sockfd)
@@ -213,7 +199,7 @@ class Collector(threading.Thread):
         start_thread(self.__start_cli)
         start_thread(self.__is_alive)
         self.__start_collector()
-        LOGGER.debug("Call from function start")
+        self.logger.debug("Call from function start")
 
     def __is_alive(self) -> None:
         with self.__setup_socket(self.address, COLLECTOR_HEALTH_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
@@ -238,16 +224,16 @@ class Collector(threading.Thread):
         
         Returns: None
         """
-        LOGGER.info(f"Creating new thread for client {client.name}@{client.address[0]}:{client.address[1]}")
+        self.logger.info(f"Creating new thread for client {client.name}@{client.address[0]}:{client.address[1]}")
 
         while True:
             try:
                 data, _ = receive(client.socket_obj)
                 
                 if data != None:
-                    LOGGER.info(f"Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}")
+                    self.logger.info(f"Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}")
                 else:
-                    LOGGER.info(f"Received nothing from {client.name}")
+                    self.logger.info(f"Received nothing from {client.name}")
 
                 if isinstance(data, dict):
                     data = Dict(data)
@@ -259,16 +245,16 @@ class Collector(threading.Thread):
                         dir_name = join_path(self.dir_name, data.source.split("_")[0])
                     
                     save_csv(data.data, data.source, dir_name=dir_name)
-                    LOGGER.debug(f"Saving data to {str(DATA_PATH)}/{self.dir_name}/{data.source}")
+                    self.logger.debug(f"Saving data to {str(DATA_PATH)}/{self.dir_name}/{data.source}")
 
                 msg = f"OK - {datetime.now()}"
                 send_to(client.socket_obj, msg)
-                LOGGER.debug(f"Sending '{msg}' to client {client.name}")
+                self.logger.debug(f"Sending '{msg}' to client {client.name}")
 
             except:
                 addr, port = client.address
-                LOGGER.info(f"Unregistered {client.name} {addr}:{port}")
-                LOGGER.error('What happened??', exc_info=1)
+                self.logger.info(f"Unregistered {client.name} {addr}:{port}")
+                self.logger.error('What happened??', exc_info=1)
                 self.mutex.acquire()
                 self.__instances.remove(client)
                 self.mutex.release()

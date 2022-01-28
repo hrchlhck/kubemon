@@ -1,12 +1,12 @@
-from ..dataclasses import Client
-from typing import Dict, List
 from kubemon.utils import receive, send_to, is_alive
-
 from kubemon.config import (
     DATA_PATH, 
     START_MESSAGE, 
     DEFAULT_DAEMON_PORT
 )
+
+from typing import Dict
+from datetime import datetime
 
 import dataclasses
 import socket
@@ -32,6 +32,9 @@ COMMANDS = {
 
 @dataclasses.dataclass
 class Command(abc.ABC):
+    def __init__(self, collector):
+        self._collector = collector
+
     @abc.abstractmethod
     def execute(self) -> str:
         pass
@@ -43,41 +46,42 @@ class StartCommand(Command):
         - Directory name to be saving the data collected. Ex.: start test000
     """
 
-    def __init__(self, instances: List[Client], daemons: List[str], dir_name: str, addr: str):
-        self._instances = instances
-        self._dir_name = dir_name
-        self._monitor_addr = addr
-        self._daemons = daemons
-
     def execute(self) -> str:
-        if not len(self._instances):
-            return "There are no connected monitors to be started\n"
+        collector = self._collector
 
-        for instance in self._instances:
+        if not len(collector.instances):
+            return "There are no connected monitors to be started.\n"
+        
+        if not collector.dir_name:
+            return "Argument 'dir_name' is missing.\n"
+
+        for instance in collector.instances:
             send_to(instance.socket_obj, START_MESSAGE)
         
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for daddr in self._daemons:
+            for daddr in collector.daemons:
                 send_to(sockfd, 'start', (daddr, DEFAULT_DAEMON_PORT))
 
-        return f"Starting {len(self._instances)} monitors and saving data at {self._monitor_addr}:{str(DATA_PATH)}/{self._dir_name}\n"
+        collector.is_running = True
+        collector.running_since = datetime.now()
+
+        return f"Starting {collector.connected_instances} monitors and saving data at {collector.address}:{str(DATA_PATH)}/{collector.dir_name}\n"
 
 
 class InstancesCommand(Command):
     """ Lists all the connected monitor instances.
     """
 
-    def __init__(self, daemons: List[str]):
-        self._daemons = daemons
-
     def execute(self) -> str:
+        collector = self._collector
         message = ""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in self._daemons:
+            for addr in collector.daemons:
                 message += f'Host: {addr}\n\n'
                 send_to(sockfd, "instances", (addr, DEFAULT_DAEMON_PORT))
                 data, _ = receive(sockfd)
                 message += data
+            message += f'Total instances connected: {collector.connected_instances}'
         
         if message == "":
             message = "No instances connected yet."
@@ -87,13 +91,12 @@ class InstancesCommand(Command):
 class ConnectedDaemonsCommand(Command):
     """ Lists all the daemons (hosts) connected.
     """
-
-    def __init__(self, instances: List[Client]):
-        self._instances = instances
     
     def execute(self) -> str:
+        collector = self._collector
+
         # Filtering only OSMonitor instances
-        os = list(filter(lambda x: x.name.startswith('OSMonitor'), self._instances))
+        os = list(filter(lambda x: x.name.startswith('OSMonitor'), collector.instances))
 
         # Parsing hostname and IP address
         os = list(map(lambda x: f"Hostname: {x.name.split('_')[5]} | IP: {'.'.join(i for i in x.name.split('_')[1:5])}", os))
@@ -108,21 +111,19 @@ class ConnectedDaemonsCommand(Command):
 class StopCommand(Command):
     """ Stop all monitors if they're running.
     """
-
-    def __init__(self, instances: List[Client], daemon_addresses: List[str], is_running: bool):
-        self._instances = instances
-        self._daemon_addresses = daemon_addresses
-        self._is_running = is_running
     
     def execute(self) -> str:
-        # if not self._is_running:
-        #     return 'Unable to stop idling monitors\n'
+        collector = self._collector
         
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in self._daemon_addresses:
+            for addr in collector.daemons:
                 send_to(sockfd, 'stop', (addr, DEFAULT_DAEMON_PORT))
         
-        return f'Stopped {len(self._instances)} instances\n'
+        collector.is_running = False
+        collector.running_since = None
+        collector.dir_name = None
+
+        return f'Stopped {collector.connected_instances} instances\n'
 
 class NotExistCommand(Command):
     """ Indicates if a command does not exist. 
@@ -149,16 +150,13 @@ class HelpCommand(Command):
 class IsRunningCommand(Command):
     """ Tells if the monitors are running.
     """
-
-    def __init__(self, daemons: List[str], since: str):
-        self._daemons = daemons
-        self._since = since
     
     def execute(self) -> str:
-        
-        msg = f"Running since: {str(self._since)}\n"
+        collector = self._collector
+
+        msg = f"Running since: {str(collector.running_since)}\n"
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in self._daemons:
+            for addr in collector.daemons:
                 send_to(sockfd, 'running', (addr, DEFAULT_DAEMON_PORT))
                 data, _ = receive(sockfd)
                 msg += addr + " - " + data
@@ -188,14 +186,21 @@ class RestartCommand(Command):
     """ Restars the monitor instances
     """
 
-    def __init__(self, daemons: List[str]):
-        self._daemons = daemons
-
     def execute(self) -> str:
+        collector = self._collector
+        
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in self._daemons:
+            for addr in collector.daemons:
+                collector.logger.debug(f'Sent \'restart\' to {addr}:{DEFAULT_DAEMON_PORT}')
                 send_to(sockfd, 'restart', (addr, DEFAULT_DAEMON_PORT))
-        return super().execute()
+
+            for client in collector.instances:
+                collector.logger.debug(f'Closed socket {client.name}@{client.socket_obj.getsockname()}')
+                client.socket_obj.close()
+
+            collector.instances = list()
+
+        return 'Restarted instances'
 
 COMMAND_CLASSES = {
     'start': StartCommand,
