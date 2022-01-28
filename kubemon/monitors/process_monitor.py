@@ -1,4 +1,5 @@
 from threading import Thread
+from black import sys
 
 from docker.models.containers import Container
 
@@ -147,14 +148,18 @@ class ProcessMonitor(BaseMonitor, Thread):
             process (int): The PID of the process that you want to get the data
             interval (int): The seconds that the script will calculate the usage
         """
-        process = psutil.Process(pid=pid)
-        cpu = cls.get_cpu_times(process)
-        io = cls.get_io_counters(process)
-        mem = BaseMonitor.get_memory_usage(pid=pid)
-        net = cls.get_net_usage(process.pid)
+        try:
+            process = psutil.Process(pid=pid)
+            cpu = cls.get_cpu_times(process)
+            io = cls.get_io_counters(process)
+            mem = BaseMonitor.get_memory_usage(pid=pid)
+            net = cls.get_net_usage(process.pid)
 
-        # Acts as time.sleep()
-        cpu_percent = process.cpu_percent(interval=interval)
+            # Acts as time.sleep()
+            cpu_percent = process.cpu_percent(interval=interval)
+        except psutil.NoSuchProcess:
+            LOGGER.error('Process not found')
+
 
         io_new = subtract_dicts(io, cls.get_io_counters(process))
         cpu_new = subtract_dicts(cpu, cls.get_cpu_times(process))
