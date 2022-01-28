@@ -1,23 +1,20 @@
+from kubemon.log import create_logger
 from kubemon.pod import Pod
-from kubemon.utils import get_container_pid, receive, send_to
+from kubemon.utils import get_containers, get_container_pid, receive
 from kubemon.monitors.base_monitor import BaseMonitor, MonitorFlag
-
-from typing import Any, List, Tuple
-
-from ..config import (
-    DEFAULT_MONITOR_INTERVAL, 
-    DEFAULT_MONITOR_PORT, DEFAULT_DAEMON_PORT,
-    MONITOR_PROBE_INTERVAL
+from kubemon.monitors.commands import COMMAND_CLASSES
+from kubemon.config import (
+    DEFAULT_MONITOR_INTERVAL, DEFAULT_MONITOR_PORT, 
+    DEFAULT_DAEMON_PORT, MONITOR_PROBE_INTERVAL
 )
-
 from . import (
     OSMonitor, 
     DockerMonitor, 
     ProcessMonitor
 )
 
+from typing import List, Tuple
 from psutil import Process as psProcess
-from ..utils import get_containers, receive
 from docker import from_env
 from time import sleep as time_sleep
 
@@ -26,6 +23,8 @@ import socket
 import sys
 
 __all__ = ['Kubemond']
+
+LOGGER = create_logger('daemon')
 
 class Kubemond(threading.Thread):
     """ Kubemon Daemon Class. """
@@ -39,14 +38,7 @@ class Kubemond(threading.Thread):
         self.__mutex = threading.Lock()
         self.__monitors = []
         self.__directory = None
-        self.__functions = {
-            'start': self.start_modules,
-            'stop': self.stop_modules,
-            'running': self.running,
-            'instances': self.list_instances,
-            'n_monitors': self.num_monitors,
-            'restart': self.restart,
-        }
+        self.logger = LOGGER
         threading.Thread.__init__(self)
     
     @property
@@ -93,7 +85,7 @@ class Kubemond(threading.Thread):
         return self.__mutex
  
     def listen_commands(self) -> None:
-        print("Started listen_commands")
+        self.logger.debug("Started listen_commands")
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             sockfd.bind(('0.0.0.0', DEFAULT_DAEMON_PORT))
@@ -106,70 +98,17 @@ class Kubemond(threading.Thread):
                 cmd, *args = data.split()
                 cmd = cmd.lower()
 
-                print(f"Received from {addr}: {data} ({sys.getsizeof(data)} bytes)", file=sys.stdout)
+                self.logger.debug(f"Received from {addr}: {data} ({sys.getsizeof(data)} bytes)")
 
                 # Getting the function according to the received command
-                ret = self.__functions.get(cmd)
+                command = COMMAND_CLASSES.get(cmd)
 
                 # If it exists, then execute it with the received arguments
-                if ret != None:
-                    if cmd == 'instances' or cmd == 'running' or cmd == 'n_monitors':
-                        ret(sockfd, addr)
-                    else:
-                        ret(*args)
+                if command:
+                    command = command(self, sockfd, addr)
+                    self.logger.info(command.execute())
                 else:
-                    print(f"Command '{data}' does not exist")
-
-    def num_monitors(self, sockfd: socket.socket, addr: tuple) -> None:
-        n_monitors = f'{len(self.monitors)}\n'
-        send_to(sockfd, n_monitors, addr)
-
-    def running(self, sockfd: socket.socket, addr: tuple) -> None:
-        msg = 'Is running?: '
-        msg += 'Yes' if self.is_running else 'No'
-        msg += '\n'
-        send_to(sockfd, msg, addr)
-
-    def list_instances(self, sockfd: socket.socket, addr: tuple) -> None:
-        msg = ""
-        monitor_per_class = {
-            'OS': [m for m in self.monitors if isinstance(m, OSMonitor)], 
-            'Process': [m for m in self.monitors if isinstance(m, ProcessMonitor)], 
-            'Docker': [m for m in self.monitors if isinstance(m, DockerMonitor)]
-        }
-
-        for klass, instances in monitor_per_class.items():
-            msg += klass + ' - ' + str(len(monitor_per_class[klass])) + '\n\t'
-            msg += '\n\t'.join([str(i) for i in instances]) + '\n'
-            msg += '\n'
-        send_to(sockfd, msg, addr)
-
-    def start_modules(self, *args) -> None:
-        print("Called start_modules")
-        self.is_running = True
-
-    def stop_modules(self, *args) -> None:
-        print("Called stop_modules")
-
-        running_instances = [instance for instance in self.monitors if instance.flag == MonitorFlag.RUNNING]
-
-        if not running_instances:
-            print("There are no monitors running")
-            return
-
-        for monitor in running_instances:
-            self.mutex.acquire()
-            monitor.flag = MonitorFlag.IDLE
-            monitor.stop_request = True
-            print("Stopping ", monitor)
-            self.mutex.release()
-        
-        self.is_running = False
-
-    def restart(self, *args) -> None:
-        self.monitors = list()
-        self.__init_monitors()
-        self.__start_monitors(self.monitors)
+                    self.logger.info(f"Command '{data}' does not exist")
 
     def probe_new_instances(self) -> None:
         args = self.address, self.port, self.interval
@@ -182,21 +121,21 @@ class Kubemond(threading.Thread):
             if has_changed:
                 self.monitors += new_instances
 
-                self.__start_monitors(new_instances)
+                self._start_monitors(new_instances)
             time_sleep(self.probe_interval)
 
-    def __start_monitors(self, instances: List[BaseMonitor]) -> None:
+    def _start_monitors(self, instances: List[BaseMonitor]) -> None:
         for monitor in instances:
             if monitor.flag == MonitorFlag.NOT_CONNECTED and not monitor.is_alive():
                 monitor.start()
 
     def run(self) -> None:
-        self.__init_monitors()
+        self._init_monitors()
 
-        print("Started daemon")
+        self.logger.info("Started daemon")
 
         # Create all monitor instances 
-        self.__start_monitors(self.monitors)
+        self._start_monitors(self.monitors)
 
         # Probe if any new container/pod/process has been created
         threading.Thread(target=self.probe_new_instances).start()
@@ -208,7 +147,7 @@ class Kubemond(threading.Thread):
         ret = [instance for instance in new if str(instance) not in list(map(str, self.monitors))]
         return len(ret) > 0, ret
 
-    def __init_monitors(self) -> None:
+    def _init_monitors(self) -> None:
         self.monitors += [OSMonitor(address=self.address, port=self.port, interval=self.interval)]
         self.monitors += docker_instances(self.address, self.port, self.interval)
         self.monitors += process_instances(self.address, self.port, self.interval)
