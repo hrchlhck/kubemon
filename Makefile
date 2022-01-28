@@ -19,6 +19,9 @@ collector:
 	vpemfh7/kubemon:latest \
 	-t collector
 
+server:
+	sudo -b su -c "venv/bin/python -m kubemon -t collector >> collector.out 2>&1 &"
+
 stop_collector:
 	docker kill $(shell docker ps | grep collector | awk '{print $$1}')
 
