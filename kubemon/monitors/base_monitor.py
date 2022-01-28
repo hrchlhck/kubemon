@@ -10,7 +10,6 @@ from ..config import (
 
 from ..decorators import wrap_exceptions
 from typing import Callable
-from threading import Lock
 from ..log import create_logger
 from enum import Enum
 
@@ -137,7 +136,6 @@ class BaseMonitor:
 
         return ret
 
-    @wrap_exceptions(KeyboardInterrupt)
     def send(self, function: Callable, function_args: list, container_name="", pid=0) -> None:
         """ 
         Wrapper function for gathering and sending data from docker containers in a gap of N seconds defined by `interval` parameter.
