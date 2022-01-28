@@ -1,5 +1,4 @@
 from threading import Thread
-from black import sys
 
 from docker.models.containers import Container
 
