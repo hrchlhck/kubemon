@@ -136,6 +136,10 @@ class Collector(threading.Thread):
                     self.running_since = datetime.now()
                 elif cmd == "instances":
                     cmd_args = (self.daemons,)
+                    LOGGER.debug('Total instances connected: ' + str(self.connected_instances))
+                elif cmd == 'restart':
+                    cmd_args = (self.daemons,)
+                    self.__instances = list()
                 elif cmd == "is_running":
                     cmd_args = (self.daemons, self.running_since)
                 elif cmd == "daemons":

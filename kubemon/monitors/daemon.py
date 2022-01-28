@@ -45,6 +45,7 @@ class Kubemond(threading.Thread):
             'running': self.running,
             'instances': self.list_instances,
             'n_monitors': self.num_monitors,
+            'restart': self.restart,
         }
         threading.Thread.__init__(self)
     
@@ -143,7 +144,7 @@ class Kubemond(threading.Thread):
             msg += '\n'
         send_to(sockfd, msg, addr)
 
-    def start_modules(self, *args) -> Any:
+    def start_modules(self, *args) -> None:
         print("Called start_modules")
         self.is_running = True
 
@@ -165,11 +166,15 @@ class Kubemond(threading.Thread):
         
         self.is_running = False
 
+    def restart(self, *args) -> None:
+        self.monitors = list()
+        self.__init_monitors()
+        self.__start_monitors(self.monitors)
+
     def probe_new_instances(self) -> None:
         args = self.address, self.port, self.interval
 
         while True:
-            time_sleep(self.probe_interval)
             instances = docker_instances(*args) + process_instances(*args)
 
             has_changed, new_instances = self.has_changed(instances)
@@ -177,9 +182,13 @@ class Kubemond(threading.Thread):
             if has_changed:
                 self.monitors += new_instances
 
-                for monitor in new_instances:
-                    if monitor.flag == MonitorFlag.NOT_CONNECTED and not monitor.is_alive():
-                        monitor.start()
+                self.__start_monitors(new_instances)
+            time_sleep(self.probe_interval)
+
+    def __start_monitors(self, instances: List[BaseMonitor]) -> None:
+        for monitor in instances:
+            if monitor.flag == MonitorFlag.NOT_CONNECTED and not monitor.is_alive():
+                monitor.start()
 
     def run(self) -> None:
         self.__init_monitors()
@@ -187,11 +196,7 @@ class Kubemond(threading.Thread):
         print("Started daemon")
 
         # Create all monitor instances 
-        for monitor in self.monitors:
-            if monitor.flag == MonitorFlag.NOT_CONNECTED:
-                monitor.start()
-            else:
-                print(f"Monitor {monitor} already connected to collector")
+        self.__start_monitors(self.monitors)
 
         # Probe if any new container/pod/process has been created
         threading.Thread(target=self.probe_new_instances).start()

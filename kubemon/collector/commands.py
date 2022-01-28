@@ -184,6 +184,19 @@ class IsAliveCommand(Command):
 
         return msg
 
+class RestartCommand(Command):
+    """ Restars the monitor instances
+    """
+
+    def __init__(self, daemons: List[str]):
+        self._daemons = daemons
+
+    def execute(self) -> str:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            for addr in self._daemons:
+                send_to(sockfd, 'restart', (addr, DEFAULT_DAEMON_PORT))
+        return super().execute()
+
 COMMAND_CLASSES = {
     'start': StartCommand,
     'instances': InstancesCommand,
@@ -193,4 +206,5 @@ COMMAND_CLASSES = {
     'help': HelpCommand,
     'is_running': IsRunningCommand,
     'is_alive': IsAliveCommand,
+    'restart': RestartCommand,
 }
