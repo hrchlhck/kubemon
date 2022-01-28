@@ -139,6 +139,11 @@ class Collector(threading.Thread):
                     LOGGER.debug('Total instances connected: ' + str(self.connected_instances))
                 elif cmd == 'restart':
                     cmd_args = (self.daemons,)
+
+                    for i in self.__instances:
+                        LOGGER.debug(f'Closing connection of {i.name}')
+                        i.socket_obj.close()
+
                     self.__instances = list()
                 elif cmd == "is_running":
                     cmd_args = (self.daemons, self.running_since)
