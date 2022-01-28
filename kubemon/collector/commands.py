@@ -1,6 +1,7 @@
 from kubemon.utils import receive, send_to, is_alive
 from kubemon.config import (
-    DATA_PATH, 
+    DATA_PATH,
+    RESTART_MESSAGE, 
     START_MESSAGE, 
     DEFAULT_DAEMON_PORT
 )
@@ -88,6 +89,22 @@ class InstancesCommand(Command):
 
         return message
 
+class IsReadyCommand(Command):
+    """ Returns the expected amount of instances that should 
+    be connected to the collector.
+    """
+
+    def execute(self) -> str:
+        collector = self._collector
+        total = 0
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            for addr in collector.daemons:
+                send_to(sockfd, "n_monitors", (addr, DEFAULT_DAEMON_PORT))
+                n, _ = receive(sockfd)
+                total += int(n)
+
+        return collector.connected_instances == total and total != 0
+
 class ConnectedDaemonsCommand(Command):
     """ Lists all the daemons (hosts) connected.
     """
@@ -121,7 +138,6 @@ class StopCommand(Command):
         
         collector.is_running = False
         collector.running_since = None
-        collector.dir_name = None
 
         return f'Stopped {collector.connected_instances} instances\n'
 
@@ -142,8 +158,10 @@ class HelpCommand(Command):
         msg = ""
 
         for key, value in self._cmd_dict.items():
-            msg += f'\'{key}\':'
-            msg += value.__doc__ + '\n'
+            # Ignoring dunder commands
+            if not key.startswith('_'):
+                msg += f'\'{key}\':'
+                msg += value.__doc__ + '\n'
         
         return msg
 
@@ -170,17 +188,8 @@ class IsAliveCommand(Command):
         self._addr = address
         self._port = port
 
-    def execute(self) -> str:
-        alive, sockfd = is_alive(self._addr, self._port)
-
-        msg = 'Collector is offline.'
-
-        if alive and sockfd:
-            print('Ping')
-            msg, _ = receive(sockfd)
-            sockfd.close()
-
-        return msg
+    def execute(self) -> bool:
+        return is_alive(self._addr, self._port)
 
 class RestartCommand(Command):
     """ Restars the monitor instances
@@ -193,14 +202,17 @@ class RestartCommand(Command):
             for addr in collector.daemons:
                 collector.logger.debug(f'Sent \'restart\' to {addr}:{DEFAULT_DAEMON_PORT}')
                 send_to(sockfd, 'restart', (addr, DEFAULT_DAEMON_PORT))
+            
+            msg, addr = receive(sockfd)
+            
+            if msg == RESTART_MESSAGE:
+                for client in collector.instances:
+                    collector.logger.debug(f'Closed socket {client.name}@{client.socket_obj.getsockname()}')
+                    client.socket_obj.close()
 
-            for client in collector.instances:
-                collector.logger.debug(f'Closed socket {client.name}@{client.socket_obj.getsockname()}')
-                client.socket_obj.close()
+                collector.instances = list()
 
-            collector.instances = list()
-
-        return 'Restarted instances'
+        return 'Restarted daemons'
 
 COMMAND_CLASSES = {
     'start': StartCommand,
@@ -212,4 +224,5 @@ COMMAND_CLASSES = {
     'is_running': IsRunningCommand,
     'is_alive': IsAliveCommand,
     'restart': RestartCommand,
+    '_is_ready': IsReadyCommand,
 }

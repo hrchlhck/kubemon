@@ -23,6 +23,10 @@ class CollectorClient(threading.Thread):
         return self.__port
 
     def exec(self, cmd):
+        if cmd == 'is_alive':
+            data = IsAliveCommand(self.address, COLLECTOR_HEALTH_CHECK_PORT).execute()
+            return data
+            
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
             send_to(sockfd, cmd, (self.address, self.port))
             data, _ = receive(sockfd)

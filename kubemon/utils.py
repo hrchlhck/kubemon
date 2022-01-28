@@ -249,7 +249,7 @@ def is_alive(address: str, port: int) -> bool:
 
     try:
         sockfd.connect((address, port))
-        return True, sockfd
+        return True
     except:
         sockfd.close()
-        return False, None
+        return False

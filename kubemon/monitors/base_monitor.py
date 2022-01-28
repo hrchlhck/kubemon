@@ -23,6 +23,7 @@ class MonitorFlag(Enum):
     IDLE = 0
     RUNNING = 1
     NOT_CONNECTED = 2
+    STOPPED = 3
 
 class BaseMonitor:
     def __init__(self, address, port=DEFAULT_MONITOR_PORT, interval=DEFAULT_MONITOR_INTERVAL):
@@ -165,6 +166,7 @@ class BaseMonitor:
                     LOGGER.error("Monitor died")
                     exit()
 
+                self.flag = MonitorFlag.IDLE
                 if signal == START_MESSAGE:
                     LOGGER.info(f"[ {source_name} ] Starting")
 
@@ -189,3 +191,4 @@ class BaseMonitor:
                     if self.stop_request:
                         LOGGER.info(f'Stopped monitor {source_name}')
                         self.stop_request = False
+                        self.flag = MonitorFlag.STOPPED

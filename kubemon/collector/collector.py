@@ -208,12 +208,9 @@ class Collector(threading.Thread):
             while True:
                 conn, _ = sockfd.accept()
 
-                send_to(conn, 'Pong!')
-
                 sleep(1)
 
                 conn.close()
-
 
     def __listen_monitors(self, client: Client) -> None:
         """ Listen for monitors. 

@@ -14,6 +14,7 @@ DATA_PATH = DATA_DIR / 'data'
 
 # Starting message
 START_MESSAGE = "OK"
+RESTART_MESSAGE = 0x55AA
 
 # Monitors configuration
 DEFAULT_MONITOR_PORT = 9822
