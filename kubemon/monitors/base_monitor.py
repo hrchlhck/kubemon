@@ -24,6 +24,7 @@ class MonitorFlag(Enum):
     RUNNING = 1
     NOT_CONNECTED = 2
     STOPPED = 3
+    NEVER_STARTED = 4
 
 class BaseMonitor:
     def __init__(self, address, port=DEFAULT_MONITOR_PORT, interval=DEFAULT_MONITOR_INTERVAL):
@@ -157,6 +158,8 @@ class BaseMonitor:
 
             send_to(sockfd, source_name)
             LOGGER.debug(f"Sent my name to collector at {self.address}:{self.port}")
+
+            self.flag = MonitorFlag.NEVER_STARTED
 
             while True:
                 try:

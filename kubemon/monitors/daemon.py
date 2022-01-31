@@ -1,11 +1,13 @@
 from kubemon.log import create_logger
 from kubemon.pod import Pod
-from kubemon.utils import get_containers, get_container_pid, receive
+from kubemon.utils import get_containers, get_container_pid, get_host_ip, is_alive, receive, send_to
 from kubemon.monitors.base_monitor import BaseMonitor, MonitorFlag
 from kubemon.monitors.commands import COMMAND_CLASSES
 from kubemon.config import (
-    DEFAULT_MONITOR_INTERVAL, DEFAULT_MONITOR_PORT, 
-    DEFAULT_DAEMON_PORT, MONITOR_PROBE_INTERVAL
+    COLLECTOR_HEALTH_CHECK_PORT, COLLECTOR_INSTANCES_CHECK_PORT, 
+    DEFAULT_CLI_PORT, DEFAULT_MONITOR_INTERVAL, 
+    DEFAULT_MONITOR_PORT, DEFAULT_DAEMON_PORT, 
+    MONITOR_PROBE_INTERVAL
 )
 from . import (
     OSMonitor, 
@@ -129,16 +131,51 @@ class Kubemond(threading.Thread):
             if monitor.flag == MonitorFlag.NOT_CONNECTED and not monitor.is_alive():
                 monitor.start()
 
+    def _send_num_monitors(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
+            self.logger.debug('Waiting for collector response')
+            send_to(sockfd, '_num_monitors', (self.address, DEFAULT_CLI_PORT))
+            # msg, addr = receive(sockfd)
+
+    def _connect_collector(self):
+        self.logger.info('Started _connect_collector')
+        state = is_alive(self.address, COLLECTOR_HEALTH_CHECK_PORT)
+
+        while not state:
+            self.logger.debug('Waiting for collector to be alive')
+            time_sleep(2)
+            state = is_alive(self.address, COLLECTOR_HEALTH_CHECK_PORT)
+        else:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
+                sockfd.connect((self.address, COLLECTOR_INSTANCES_CHECK_PORT))
+                self.logger.info('Connected to collector')
+
+                name = f'[Daemon] - {socket.gethostname()}'
+                address = str(get_host_ip())
+                msg = (name, address)
+
+                send_to(sockfd, msg)
+                self.logger.debug(f'Sent {msg} to {self.address}:{COLLECTOR_INSTANCES_CHECK_PORT}')
+
+                while True:
+                    time_sleep(2)
+                    msg = len(self.monitors)
+                    send_to(sockfd, msg)
+                    self.logger.debug(f'Sent {msg} to {self.address}:{COLLECTOR_INSTANCES_CHECK_PORT}')
+
     def run(self) -> None:
         self._init_monitors()
-
-        self.logger.info("Started daemon")
 
         # Create all monitor instances 
         self._start_monitors(self.monitors)
 
+        self.logger.info("Started daemon")
+
         # Probe if any new container/pod/process has been created
         threading.Thread(target=self.probe_new_instances).start()
+
+        # Keep sending the amount of instances to the collector
+        threading.Thread(target=self._connect_collector).start()
 
         # Listen any incoming commands to redirect to the monitors
         self.listen_commands()

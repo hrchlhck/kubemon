@@ -1,5 +1,5 @@
-from kubemon.config import RESTART_MESSAGE
-from kubemon.utils import send_to
+from kubemon.config import RESTART_MESSAGE, STOP_MESSAGE
+from kubemon.utils import receive, send_to
 from kubemon.monitors import OSMonitor, DockerMonitor, ProcessMonitor
 from kubemon.monitors.base_monitor import MonitorFlag
 
@@ -42,7 +42,9 @@ class StopCommand(Command):
             self._log.info(f"Stopping {monitor}")
             self._daemon.mutex.release()
         
-        self.is_running = False
+        self._daemon.is_running = False
+
+        send_to(self._sockfd, STOP_MESSAGE, self._addr)
 
         return 'Stopped modules'
 
@@ -63,7 +65,8 @@ class NumMonitorsCommand(Command):
 
 class RestartCommand(Command):
     def execute(self) -> str:
-        for monitor in self._daemon.monitors:
+        monitors = [m for m in self._daemon.monitors if m.flag != MonitorFlag.NEVER_STARTED]
+        for monitor in monitors:
             while monitor.flag is not MonitorFlag.STOPPED:
                 self._log.info(f'Waiting for {monitor} to be stopped')
                 time.sleep(2)
@@ -73,6 +76,9 @@ class RestartCommand(Command):
         self._daemon.monitors = list()
         self._daemon._init_monitors()
         self._daemon._start_monitors(self._daemon.monitors)
+
+        send_to(self._sockfd, len(self._daemon.monitors), self._addr)
+
         return 'Restarted'
 
 class ListInstancesCommand(Command):

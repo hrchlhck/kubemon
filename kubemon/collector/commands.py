@@ -3,7 +3,8 @@ from kubemon.config import (
     DATA_PATH,
     RESTART_MESSAGE, 
     START_MESSAGE, 
-    DEFAULT_DAEMON_PORT
+    DEFAULT_DAEMON_PORT,
+    STOP_MESSAGE
 )
 
 from typing import Dict
@@ -60,7 +61,7 @@ class StartCommand(Command):
             send_to(instance.socket_obj, START_MESSAGE)
         
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for daddr in collector.daemons:
+            for daddr in collector.daemons.values():
                 send_to(sockfd, 'start', (daddr, DEFAULT_DAEMON_PORT))
 
         collector.is_running = True
@@ -77,7 +78,7 @@ class InstancesCommand(Command):
         collector = self._collector
         message = ""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons:
+            for addr in collector.daemons.values():
                 message += f'Host: {addr}\n\n'
                 send_to(sockfd, "instances", (addr, DEFAULT_DAEMON_PORT))
                 data, _ = receive(sockfd)
@@ -98,12 +99,12 @@ class IsReadyCommand(Command):
         collector = self._collector
         total = 0
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons:
+            for addr in collector.daemons.values():
                 send_to(sockfd, "n_monitors", (addr, DEFAULT_DAEMON_PORT))
                 n, _ = receive(sockfd)
                 total += int(n)
 
-        return collector.connected_instances == total and total != 0
+        return collector.connected_instances == total and total != 0 and collector.expected_instances == total
 
 class ConnectedDaemonsCommand(Command):
     """ Lists all the daemons (hosts) connected.
@@ -112,17 +113,13 @@ class ConnectedDaemonsCommand(Command):
     def execute(self) -> str:
         collector = self._collector
 
-        # Filtering only OSMonitor instances
-        os = list(filter(lambda x: x.name.startswith('OSMonitor'), collector.instances))
+        daemons = collector.daemons
 
-        # Parsing hostname and IP address
-        os = list(map(lambda x: f"Hostname: {x.name.split('_')[5]} | IP: {'.'.join(i for i in x.name.split('_')[1:5])}", os))
-
-        message = f"Total daemons connected: {len(os)}\n"
+        message = f"Total daemons connected: {len(daemons)}\n"
         
-        if len(os):
-            for monitor in os:
-                message += "- " + monitor + "\n"
+        if len(daemons):
+            for name, addr in daemons.items():
+                message += "- " + name + " | " + addr + "\n"
         return message
 
 class StopCommand(Command):
@@ -133,11 +130,16 @@ class StopCommand(Command):
         collector = self._collector
         
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons:
+            for addr in collector.daemons.values():
                 send_to(sockfd, 'stop', (addr, DEFAULT_DAEMON_PORT))
-        
-        collector.is_running = False
-        collector.running_since = None
+
+                msg, _ = receive(sockfd)
+
+                collector.logger.debug(f'Received {msg}')
+                
+                if msg == STOP_MESSAGE:
+                    collector.is_running = False
+                    collector.running_since = None
 
         return f'Stopped {collector.connected_instances} instances\n'
 
@@ -174,7 +176,7 @@ class IsRunningCommand(Command):
 
         msg = f"Running since: {str(collector.running_since)}\n"
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons:
+            for addr in collector.daemons.values():
                 send_to(sockfd, 'running', (addr, DEFAULT_DAEMON_PORT))
                 data, _ = receive(sockfd)
                 msg += addr + " - " + data
@@ -199,16 +201,19 @@ class RestartCommand(Command):
         collector = self._collector
         
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons:
+            for addr in collector.daemons.values():
                 collector.logger.debug(f'Sent \'restart\' to {addr}:{DEFAULT_DAEMON_PORT}')
                 send_to(sockfd, 'restart', (addr, DEFAULT_DAEMON_PORT))
             
             msg, addr = receive(sockfd)
             
             if msg == RESTART_MESSAGE:
-                for client in collector.instances:
-                    collector.logger.debug(f'Closed socket {client.name}@{client.socket_obj.getsockname()}')
-                    client.socket_obj.close()
+                for addr in collector.daemons.values():
+                    instances = [i for i in collector.instances if addr == i.address[0]]
+
+                    for client in instances:
+                        collector.logger.debug(f'Closed socket {client.name}@{client.socket_obj.getsockname()}')
+                        client.socket_obj.close()
 
                 collector.instances = list()
 

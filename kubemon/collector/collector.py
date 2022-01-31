@@ -3,7 +3,7 @@ from kubemon.dataclasses import Client
 from kubemon.log import create_logger
 
 from kubemon.config import (
-    DATA_PATH, DEFAULT_CLI_PORT,
+    COLLECTOR_INSTANCES_CHECK_PORT, DATA_PATH, DEFAULT_CLI_PORT,
     DEFAULT_MONITOR_PORT, 
     COLLECTOR_HEALTH_CHECK_PORT
 )
@@ -11,7 +11,7 @@ from kubemon.utils import (
     save_csv, receive, send_to
 )
 
-from typing import List
+from typing import List, Dict as Dict_t
 from time import sleep
 from os.path import join as join_path
 from addict import Dict
@@ -44,6 +44,8 @@ class Collector(threading.Thread):
         self.name = self.__class__.__name__
         self.mutex = threading.Lock()
         self.__running_since = None
+        self.__instance_per_daemon = dict()
+        self.__daemons = dict()
         self.logger = LOGGER
 
     @property
@@ -71,16 +73,12 @@ class Collector(threading.Thread):
         return len(self.__instances)
     
     @property
-    def daemons(self) -> List[str]:
-        get_raddr = lambda x: x.socket_obj.getsockname()[0] if x.socket_obj.getsockname()[1] != DEFAULT_MONITOR_PORT else x.socket_obj.getpeername()
-        unique = []
-
-        for client in self.__instances:
-            addr = get_raddr(client)
-            if addr[0] not in unique:
-                unique.append(addr[0])
-
-        return unique
+    def daemons(self) -> Dict_t[str, str]:
+        return self.__daemons
+    
+    @property
+    def expected_instances(self) -> int:
+        return sum(self.__instance_per_daemon.values())
 
     @property
     def running_since(self) -> str:
@@ -198,8 +196,19 @@ class Collector(threading.Thread):
         """ Start the collector """
         start_thread(self.__start_cli)
         start_thread(self.__is_alive)
+        start_thread(self.__receive_num_instances)
         self.__start_collector()
         self.logger.debug("Call from function start")
+
+    def __receive_num_instances(self) -> None:
+        with self.__setup_socket(self.address, COLLECTOR_INSTANCES_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
+            sockfd.listen()
+            self.logger.debug(f'Started thread for __receive_num_instances')
+
+            while True:
+                conn, addr = sockfd.accept()
+                self.logger.debug(f'Accepted connection for {":".join(map(str, addr))}')
+                start_thread(self.__listen_daemon, args=(conn,))
 
     def __is_alive(self) -> None:
         with self.__setup_socket(self.address, COLLECTOR_HEALTH_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
@@ -211,6 +220,25 @@ class Collector(threading.Thread):
                 sleep(1)
 
                 conn.close()
+
+    def __listen_daemon(self, sockfd: socket.socket) -> None:
+        self.logger.debug(f'Started thread for {":".join(map(str, sockfd.getsockname()))}')
+        (name, addr), _ = receive(sockfd)
+
+        self.logger.debug(f'Received name: {name}, and address {addr}')
+
+        self.mutex.acquire()
+        self.__daemons[name] = addr
+        self.mutex.release()
+
+        while True:
+            n_instances, _ = receive(sockfd)
+            self.mutex.acquire()
+            self.__instance_per_daemon[name] = n_instances
+            self.mutex.release()
+
+            self.logger.debug(f'Instances per daemon set to: {self.__instance_per_daemon}')
+            sleep(2)
 
     def __listen_monitors(self, client: Client) -> None:
         """ Listen for monitors. 
@@ -226,7 +254,7 @@ class Collector(threading.Thread):
         while True:
             try:
                 data, _ = receive(client.socket_obj)
-                
+
                 if data != None:
                     self.logger.info(f"Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}")
                 else:
