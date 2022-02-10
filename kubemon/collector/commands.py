@@ -1,40 +1,16 @@
 from kubemon.utils import receive, send_to, is_alive
-from kubemon.config import (
-    DATA_PATH,
-    RESTART_MESSAGE, 
-    START_MESSAGE, 
-    DEFAULT_DAEMON_PORT,
-    STOP_MESSAGE
-)
-
+from kubemon.config import CONFIGURATION, DATA_PATH, MONITOR_PORT, NUM_DAEMONS, START_MESSAGE
 from typing import Dict
 from datetime import datetime
 
 import dataclasses
 import socket
+import requests
 import abc
-
-__all__ = [
-    'Command', 
-    'COMMANDS'
-    'NotExistCommand', 
-    'StartCommand', 
-    'InstancesCommand', 
-    'ConnectedDaemonsCommand',
-    'StopCommand',
-    'HelpCommand'
-]
-
-COMMANDS = {
-    'StartCommand': 'start <output_dir>', 
-    'InstancesCommand': 'instances',
-    'ConnectedDaemonsCommand': 'daemons',
-    'StopCommand': 'stop',
-}
 
 @dataclasses.dataclass
 class Command(abc.ABC):
-    def __init__(self, collector):
+    def __init__(self, collector,):
         self._collector = collector
 
     @abc.abstractmethod
@@ -51,23 +27,19 @@ class StartCommand(Command):
     def execute(self) -> str:
         collector = self._collector
 
-        if not len(collector.instances):
-            return "There are no connected monitors to be started.\n"
+        # if not len(collector.instances):
+        #     return "There are no connected monitors to be started.\n"
         
         if not collector.dir_name:
             return "Argument 'dir_name' is missing.\n"
 
-        for instance in collector.instances:
-            send_to(instance.socket_obj, START_MESSAGE)
-        
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for daddr in collector.daemons.values():
-                send_to(sockfd, 'start', (daddr, DEFAULT_DAEMON_PORT))
+        for instance in collector.collector_sockets:
+            sock = collector.collector_sockets[instance]
+            send_to(sock, START_MESSAGE)
 
-        collector.is_running = True
         collector.running_since = datetime.now()
 
-        return f"Starting {collector.connected_instances} monitors and saving data at {collector.address}:{str(DATA_PATH)}/{collector.dir_name}\n"
+        return f"Starting {len(collector)} daemons and saving data at {collector.address}:{str(DATA_PATH)}/{collector.dir_name}\n"
 
 
 class InstancesCommand(Command):
@@ -77,16 +49,15 @@ class InstancesCommand(Command):
     def execute(self) -> str:
         collector = self._collector
         message = ""
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons.values():
-                message += f'Host: {addr}\n\n'
-                send_to(sockfd, "instances", (addr, DEFAULT_DAEMON_PORT))
-                data, _ = receive(sockfd)
-                message += data
-            message += f'Total instances connected: {collector.connected_instances}'
+        port = MONITOR_PORT
         
-        if message == "":
-            message = "No instances connected yet."
+        total = 0
+        for hostname, addr in collector.daemons.items():
+            req = requests.get(f'http://{addr}:{port}').json()
+            total += len(req)
+            message += f'Instances in {hostname}@{addr}: {len(req)}\n'
+
+        message += f'Total instances: {total}'  
 
         return message
 
@@ -97,14 +68,9 @@ class IsReadyCommand(Command):
 
     def execute(self) -> str:
         collector = self._collector
-        total = 0
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons.values():
-                send_to(sockfd, "n_monitors", (addr, DEFAULT_DAEMON_PORT))
-                n, _ = receive(sockfd)
-                total += int(n)
+        collector.logger.info(collector.collect_status)
 
-        return collector.connected_instances == total and total != 0 and collector.expected_instances == total
+        return not collector.stop_request and len(collector) == NUM_DAEMONS
 
 class ConnectedDaemonsCommand(Command):
     """ Lists all the daemons (hosts) connected.
@@ -129,19 +95,12 @@ class StopCommand(Command):
     def execute(self) -> str:
         collector = self._collector
         
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons.values():
-                send_to(sockfd, 'stop', (addr, DEFAULT_DAEMON_PORT))
+        with collector.mutex:
+            collector.stop_request = True
+        
+        collector.event.wait()
 
-                msg, _ = receive(sockfd)
-
-                collector.logger.debug(f'Received {msg}')
-                
-                if msg == STOP_MESSAGE:
-                    collector.is_running = False
-                    collector.running_since = None
-
-        return f'Stopped {collector.connected_instances} instances\n'
+        return 'Stopped collector\n'
 
 class NotExistCommand(Command):
     """ Indicates if a command does not exist. 
@@ -167,22 +126,6 @@ class HelpCommand(Command):
         
         return msg
 
-class IsRunningCommand(Command):
-    """ Tells if the monitors are running.
-    """
-    
-    def execute(self) -> str:
-        collector = self._collector
-
-        msg = f"Running since: {str(collector.running_since)}\n"
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons.values():
-                send_to(sockfd, 'running', (addr, DEFAULT_DAEMON_PORT))
-                data, _ = receive(sockfd)
-                msg += addr + " - " + data
-
-        return msg + '\n'
-
 class IsAliveCommand(Command):
     """ Tells if the collector is alive.
     """
@@ -200,24 +143,10 @@ class RestartCommand(Command):
     def execute(self) -> str:
         collector = self._collector
         
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-            for addr in collector.daemons.values():
-                collector.logger.debug(f'Sent \'restart\' to {addr}:{DEFAULT_DAEMON_PORT}')
-                send_to(sockfd, 'restart', (addr, DEFAULT_DAEMON_PORT))
-            
-            msg, addr = receive(sockfd)
-            
-            if msg == RESTART_MESSAGE:
-                for addr in collector.daemons.values():
-                    instances = [i for i in collector.instances if addr == i.address[0]]
+        with collector.mutex:
+            collector.stop_request = False
 
-                    for client in instances:
-                        collector.logger.debug(f'Closed socket {client.name}@{client.socket_obj.getsockname()}')
-                        client.socket_obj.close()
-
-                collector.instances = list()
-
-        return 'Restarted daemons'
+        return 'Restarted collector\n'
 
 COMMAND_CLASSES = {
     'start': StartCommand,
@@ -226,8 +155,7 @@ COMMAND_CLASSES = {
     'stop': StopCommand,
     'not exist': NotExistCommand,
     'help': HelpCommand,
-    'is_running': IsRunningCommand,
-    'is_alive': IsAliveCommand,
+    'alive': IsAliveCommand,
     'restart': RestartCommand,
     '_is_ready': IsReadyCommand,
 }

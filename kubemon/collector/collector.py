@@ -1,17 +1,21 @@
 from kubemon.collector.commands import COMMAND_CLASSES, HelpCommand
-from kubemon.dataclasses import Client
 from kubemon.log import create_logger
 
-from kubemon.config import (
-    COLLECTOR_INSTANCES_CHECK_PORT, DATA_PATH, DEFAULT_CLI_PORT,
-    DEFAULT_MONITOR_PORT, 
-    COLLECTOR_HEALTH_CHECK_PORT
+from kubemon.config import ( 
+    DATA_PATH, 
+    START_MESSAGE,
+    CLI_PORT,
+    COLLECT_INTERVAL,
+    COLLECT_TASK_PORT,
+    COLLECTOR_HEALTH_CHECK_PORT,
+    COLLECTOR_INSTANCES_CHECK_PORT,
+    MONITOR_PORT
 )
 from kubemon.utils import (
-    save_csv, receive, send_to
+    in_both, save_csv, receive, send_to, subtract_dicts
 )
 
-from typing import List, Dict as Dict_t
+from typing import Dict as Dict_t, Tuple
 from time import sleep
 from os.path import join as join_path
 from addict import Dict
@@ -19,6 +23,7 @@ from datetime import datetime
 
 import socket
 import threading
+import requests
 
 def start_thread(func, args=tuple()):
     """
@@ -33,19 +38,20 @@ def start_thread(func, args=tuple()):
 LOGGER = create_logger(__name__)
 
 class Collector(threading.Thread):
-    def __init__(self, address: str, port: int, cli_port=DEFAULT_CLI_PORT):
+    def __init__(self, address: str, port: int, cli_port=CLI_PORT):
         threading.Thread.__init__(self)
         self.__address = address
         self.__port = port
         self.__cli_port = cli_port
-        self.__instances = list()
         self.dir_name = None
-        self.is_running = False
-        self.name = self.__class__.__name__
         self.mutex = threading.Lock()
+        self.name = self.__class__.__name__
         self.__running_since = None
-        self.__instance_per_daemon = dict()
         self.__daemons = dict()
+        self.collector_sockets = dict()
+        self.collect_status = dict()
+        self.event = threading.Event()
+        self.stop_request = False
         self.logger = LOGGER
 
     @property
@@ -59,26 +65,10 @@ class Collector(threading.Thread):
     @property
     def cli_port(self) -> int:
         return self.__cli_port
-       
-    @property
-    def instances(self) -> List[Client]:
-        return self.__instances
-    
-    @instances.setter
-    def instances(self, val: list) -> None:
-        self.__instances = val
-
-    @property
-    def connected_instances(self) -> int:
-        return len(self.__instances)
     
     @property
     def daemons(self) -> Dict_t[str, str]:
         return self.__daemons
-    
-    @property
-    def expected_instances(self) -> int:
-        return sum(self.__instance_per_daemon.values())
 
     @property
     def running_since(self) -> str:
@@ -87,29 +77,10 @@ class Collector(threading.Thread):
     @running_since.setter
     def running_since(self, val: datetime) -> None:
         self.__running_since = val
+ 
+    def __len__(self):
+        return len(self.collector_sockets)
 
-    def __accept_connections(self, sockfd: socket.socket) -> None:
-        self.logger.debug("Started function __accept_connections")
-        while True:
-            client, address = sockfd.accept()
-
-            # Receiving the monitor name
-            name, _ = receive(client)
-
-            self.logger.debug(f"Received name={name}")
-
-            client = Client(name, client, client.getsockname())
-
-            self.mutex.acquire()
-            self.__instances.append(client)
-            self.mutex.release()
-
-            self.logger.info(f"{name} connected. Address={address[0]}:{address[1]}")
-
-            start_thread(self.__listen_monitors, (client,))
-
-            print(self.daemons)
-  
     def __listen_cli(self, cli: socket.socket) -> None:
         """ 
         Function to receive and redirect commands from a CLI to monitors. 
@@ -122,38 +93,49 @@ class Collector(threading.Thread):
             None
         """
         while True:
-            data, addr = receive(cli)
+            self.logger.info(f'CLI waiting for connections')
 
-            # Splitting from 'command args' -> [command, args]
-            data = data.split()
+            conn, addr = cli.accept()
+            self.logger.info(f'CLI accepted connection with {addr[0]}:{addr[1]}')
 
-            self.logger.info(f"Received command '{data}' from {addr[0]}:{addr[1]}")
+            while True:
+                self.logger.info('Waiting for commands')
 
-            message = ""
-            if data:              
-                cmd = data[0].lower() # Command                      
+                data, _ = receive(conn)
 
-                command = COMMAND_CLASSES.get(cmd)
+                # Splitting from 'command args' -> [command, args]
+                data = data.split()
 
-                if not command:
-                    command = COMMAND_CLASSES['not exist']
+                self.logger.info(f"Received command '{data}' from {addr[0]}:{addr[1]}")
 
-                command = command(self)
+                message = ""
+                if data:              
+                    cmd = data[0].lower() # Command                      
 
-                if cmd == 'help':
-                    command = HelpCommand(COMMAND_CLASSES)
-                elif cmd == 'start':
-                    if len(data) >= 2:
-                        self.dir_name = data[1]
-                        self.logger.debug(f"dir_name set to {self.dir_name}")
+                    command = COMMAND_CLASSES.get(cmd)
 
-                message = command.execute()
+                    if not command:
+                        command = COMMAND_CLASSES['not exist']
 
-            send_to(cli, message, address=addr)
+                    command = command(self)
 
-            self.logger.debug(f"Sending '{message}' to {addr[0]}:{addr[1]}")
+                    if cmd == 'help':
+                        command = HelpCommand(COMMAND_CLASSES)
+                    elif cmd == 'start':
+                        if len(data) >= 2:
+                            self.dir_name = data[1]
+                            self.logger.debug(f"dir_name set to {self.dir_name}")
 
-    def __setup_socket(self, address: str, port: int, socktype: socket.SocketKind) -> socket.socket:
+                    message = command.execute()
+
+                send_to(conn, message)
+
+                self.logger.debug(f"Sending '{message}' to {addr[0]}:{addr[1]}")
+
+                if cmd == 'exit':
+                    break
+
+    def setsock(self, address: str, port: int, socktype: socket.SocketKind) -> socket.socket:
         """ 
         Setup a server socket 
         
@@ -175,35 +157,25 @@ class Collector(threading.Thread):
         """ Wrapper function to setup CLI. """
         
         # Setup socket
-        with self.__setup_socket(self.address, self.cli_port, socket.SOCK_DGRAM) as sockfd:
+        with self.setsock(self.address, self.cli_port, socket.SOCK_STREAM) as sockfd:
             self.logger.info(f'Started collector CLI at {self.address}:{self.cli_port}')
+            sockfd.listen(3)
 
             # Start listening for commands
             self.__listen_cli(sockfd)
 
-    def __start_collector(self) -> None:
-        """ Wrapper function to setup the collector. """
-
-        # Setup socket
-        with self.__setup_socket(self.address, self.port, socket.SOCK_STREAM) as sockfd:
-            sockfd.listen()
-            self.logger.info(f"Started collector at {self.address}:{self.port}")
-
-            # Start accepting incoming connections from monitors
-            self.__accept_connections(sockfd)
-    
     def run(self) -> None:
         """ Start the collector """
         start_thread(self.__start_cli)
         start_thread(self.__is_alive)
-        start_thread(self.__receive_num_instances)
-        self.__start_collector()
-        self.logger.debug("Call from function start")
+        start_thread(self.__register_daemons)
 
-    def __receive_num_instances(self) -> None:
-        with self.__setup_socket(self.address, COLLECTOR_INSTANCES_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
+        self.listen_collect_task()
+
+    def __register_daemons(self) -> None:
+        with self.setsock(self.address, COLLECTOR_INSTANCES_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
             sockfd.listen()
-            self.logger.debug(f'Started thread for __receive_num_instances')
+            self.logger.debug(f'Started thread for __register_daemons')
 
             while True:
                 conn, addr = sockfd.accept()
@@ -211,7 +183,7 @@ class Collector(threading.Thread):
                 start_thread(self.__listen_daemon, args=(conn,))
 
     def __is_alive(self) -> None:
-        with self.__setup_socket(self.address, COLLECTOR_HEALTH_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
+        with self.setsock(self.address, COLLECTOR_HEALTH_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
             sockfd.listen(2)
 
             while True:
@@ -227,38 +199,82 @@ class Collector(threading.Thread):
 
         self.logger.debug(f'Received name: {name}, and address {addr}')
 
-        self.mutex.acquire()
-        self.__daemons[name] = addr
-        self.mutex.release()
+        with self.mutex:
+            self.__daemons[name] = addr
 
-        while True:
-            n_instances, _ = receive(sockfd)
-            self.mutex.acquire()
-            self.__instance_per_daemon[name] = n_instances
-            self.mutex.release()
+        self.collect_task(name, addr)
 
-            self.logger.debug(f'Instances per daemon set to: {self.__instance_per_daemon}')
-            sleep(2)
+    def listen_collect_task(self) -> None:
+        with self.setsock(self.address, COLLECT_TASK_PORT, socket.SOCK_STREAM) as sockfd:
+            sockfd.listen()
 
-    def __listen_monitors(self, client: Client) -> None:
+            self.logger.info('Started listen_collect_task')
+            while True:
+                conn, addr = sockfd.accept()
+                self.logger.info(f'Accepted connection at listen_collect_task for {addr}')
+
+                msg, _ = receive(conn)
+                self.logger.info(f'Received name {msg}')
+
+                self.collector_sockets[msg] = conn
+                
+    def collect_task(self, name: str, addr: str) -> None:
+        self.logger.info(f"Calling collect_task for {name}@{addr}")
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
+            sockfd.connect((self.address, COLLECT_TASK_PORT))
+
+            send_to(sockfd, name)
+
+            while True:
+
+                msg, _ = receive(sockfd)
+                self.logger.info('Received message: %s' % msg)
+
+                if msg == START_MESSAGE:
+                    while not self.stop_request:
+                        if self.stop_request:
+                            self.logger.info(f'Stopped for {name}@{addr}')
+                            break
+
+                        old_data = requests.get(f'http://{addr}:{MONITOR_PORT}').json()
+
+                        sleep(COLLECT_INTERVAL)
+                        
+                        new_data = requests.get(f'http://{addr}:{MONITOR_PORT}').json()
+
+                        for k in in_both(old_data, new_data):
+                            ret = subtract_dicts(old_data[k], new_data[k])
+                            ret['timestamp'] = datetime.now()
+
+                            if self.dir_name:
+                                dir_name = join_path(self.dir_name, k.split("_")[0])
+
+                            save_csv(ret, k, dir_name=dir_name)
+                            self.logger.info(f"Saving data to {str(DATA_PATH)}/{self.dir_name}/{k}")
+
+                            if self.stop_request:
+                                self.event.set()
+
+
+    def __listen_monitors(self, name: str, client: socket.socket, address: Tuple[str, int]) -> None:
         """ Listen for monitors. 
 
         Args:
             client (socket.socket): Monitor socket
-            address (tuple): Monitor address
         
         Returns: None
         """
-        self.logger.info(f"Creating new thread for client {client.name}@{client.address[0]}:{client.address[1]}")
+        self.logger.info(f"Creating new thread for client {name}@{':'.join(map(str, address))}")
 
-        while True:
+        while not self.stop_request:
             try:
-                data, _ = receive(client.socket_obj)
+                data, _ = receive(client)
 
                 if data != None:
-                    self.logger.info(f"Successfully received data from {client.name}@{client.address[0]}:{client.address[1]}")
+                    self.logger.info(f"Successfully received data from {name}@{':'.join(map(str, address))}")
                 else:
-                    self.logger.info(f"Received nothing from {client.name}")
+                    self.logger.info(f"Received nothing from {name}")
 
                 if isinstance(data, dict):
                     data = Dict(data)
@@ -273,16 +289,16 @@ class Collector(threading.Thread):
                     self.logger.debug(f"Saving data to {str(DATA_PATH)}/{self.dir_name}/{data.source}")
 
                 msg = f"OK - {datetime.now()}"
-                send_to(client.socket_obj, msg)
-                self.logger.debug(f"Sending '{msg}' to client {client.name}")
+                send_to(client, msg)
+                self.logger.debug(f"Sending '{msg}' to client {name}")
 
             except:
-                addr, port = client.address
-                self.logger.info(f"Unregistered {client.name} {addr}:{port}")
+                addr, port = address
+                self.logger.info(f"Unregistered {name} {addr}:{port}")
                 self.logger.error('What happened??', exc_info=1)
-                self.mutex.acquire()
-                self.__instances.remove(client)
-                self.mutex.release()
+
+                with self.mutex:
+                    self.instances.pop(name)
 
                 # Killing thread
                 exit(1)

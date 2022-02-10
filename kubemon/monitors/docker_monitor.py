@@ -1,20 +1,19 @@
-from threading import Thread
-
-from docker.models.containers import Container
-from kubemon.config import DEFAULT_DISK_PARTITION
-
 from kubemon.utils import (
     subtract_dicts, filter_dict, 
     get_container_pid, get_host_ip
 )
 
-from .base_monitor import BaseMonitor
+
 from .process_monitor import ProcessMonitor
-from ..log import create_logger
-from ..entities.disk import Disk
-from ..pod import *
+from .base_monitor import BaseMonitor
+from kubemon.log import create_logger
+from kubemon.entities.disk import Disk
+from kubemon.pod import *
+from kubemon.config import DISK_PARTITION
+
 from time import sleep
 from typing import List
+from docker.models.containers import Container
 
 import socket
 
@@ -90,18 +89,21 @@ class StatParser:
 
         return ret
 
-class DockerMonitor(BaseMonitor, Thread):
+class DockerMonitor(BaseMonitor):
+    __slots__ = ( 
+        '__pid', '__container', 
+        '__pod', '__pods', 
+        '__name', '__stats_path'
+    )
+
     def __init__(self, container: Container, pod: Pod, pid: int, kubernetes=True, stats_path="/sys/fs/cgroup", *args, **kwargs):
         self.__container = container
         self.__pid = pid
         self.__pod = pod
-        super(DockerMonitor, self).__init__(*args, **kwargs)
         self.__stats_path = stats_path
 
         if kubernetes:
             self.__pods = Pod.list_pods(namespace="*")
-
-        Thread.__init__(self)
 
     @property
     def pods(self):
@@ -122,9 +124,13 @@ class DockerMonitor(BaseMonitor, Thread):
     @property
     def pod(self) -> Pod:
         return self.__pod
-    
+
     def __str__(self) -> str:
-        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.pid}>'
+        ip = get_host_ip().replace('.', '_')
+        return f'DockerMonitor_{socket.gethostname()}_{ip}_{self.__container.name}_{self.pid}'
+
+    def __repr__(self) -> str:
+        return f'<DockerMonitor - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.pid}>'
 
     def get_path(self, cgroup_controller: str, stat: str, container: Pair=None, pod: Pod=None) -> str:
         """ 
@@ -185,7 +191,12 @@ class DockerMonitor(BaseMonitor, Thread):
             container (Pair): Container pair namedtuple to be monitored
             _alt_path (str): Alternative path to be gathering data
         """
-        fields = ['rss', 'cache', 'mapped_file', 'pgpgin', 'pgpgout', 'pgfault', 'pgmajfault', 'active_anon', 'inactive_anon', 'active_file', 'inactive_file', 'unevictable']
+        fields = [
+            'rss', 'cache', 'mapped_file', 'pgpgin', 'pgpgout', 
+            'pgfault', 'pgmajfault', 'active_anon', 'inactive_anon', 
+            'active_file', 'inactive_file', 'unevictable'
+        ]
+
         path = self.get_path(container=container, pod=pod, cgroup_controller='memory', stat='stat')
 
         with open(path, mode='r') as fd:
@@ -267,7 +278,7 @@ class DockerMonitor(BaseMonitor, Thread):
 
         return ret
 
-    def get_stats(self, container: Pair, pod: Pod=None, disk_name=DEFAULT_DISK_PARTITION) -> dict:
+    def get_stats(self, disk_name=DISK_PARTITION) -> dict:
         """ 
         Get all metrics of a given container within a pod 
 
@@ -275,19 +286,12 @@ class DockerMonitor(BaseMonitor, Thread):
             pod (Pod): Pod container object
             container (Pair): Container pair namedtuple to be monitored
         """
-        cpu = self.get_cpu_times(container, pod)
-        memory = self.get_memory_usage(container, pod)
-        network = self.get_net_usage(container)
-        disk = self.get_disk_usage(container, pod, disk_name=disk_name)
+        cpu = self.get_cpu_times(self.container, self.pod)
+        memory = self.get_memory_usage(self.container, self.pod)
+        network = self.get_net_usage(self.container)
+        disk = self.get_disk_usage(self.container, self.pod, disk_name=disk_name)
 
-        sleep(self.interval)
-
-        cpu_new = subtract_dicts(cpu, self.get_cpu_times(container, pod))
-        memory_new = subtract_dicts(memory, self.get_memory_usage(container, pod))
-        network_new = subtract_dicts(network, self.get_net_usage(container))
-        disk_new = subtract_dicts(disk, self.get_disk_usage(container, pod, disk_name=disk_name))
-
-        ret = {**cpu_new, **memory_new, **network_new, **disk_new}
+        ret = {**cpu, **memory, **network, **disk}
         
         LOGGER.debug("Called function")
 
@@ -316,7 +320,3 @@ class DockerMonitor(BaseMonitor, Thread):
         }
 
         return subtract_dicts(ret_old, ret)
-   
-    def run(self) -> None:
-        LOGGER.debug(f"Calling method with parameters: container={self.container}, pod={self.pod}, container_pid={get_container_pid(self.container)}")
-        self.send(function=self.get_stats, function_args=(self.container, self.pod), container_name=self.container.name, pid=get_container_pid(self.container))

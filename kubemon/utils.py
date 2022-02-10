@@ -15,6 +15,7 @@ import csv
 import pickle
 import struct
 import json
+import fcntl
 
 __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data',
            'save_csv', 'format_name', 'get_containers', 'get_container_pid', 'try_connect', 'receive', 'send_to']
@@ -179,7 +180,7 @@ def try_connect(addr: str, port: int, _socket: socket.socket, timeout: int) -> N
     exit(0)
 
 
-def receive(_socket: socket.socket, encoding_type='utf8') -> str:
+def receive(_socket: socket.socket, encoding_type='utf8', buffer_size=1024) -> str:
     """ 
     Wrapper function for receiving data from a socket. It also decodes it to utf8 by default.
 
@@ -190,12 +191,12 @@ def receive(_socket: socket.socket, encoding_type='utf8') -> str:
     # UDP
     addr = None
     if _socket.type == 2:
-        recv_size, _ = _socket.recvfrom(4)
-        buffer_size = struct.unpack('I', recv_size)[0]
+        # recv_size, _ = _socket.recvfrom(4)
+        # buffer_size = struct.unpack('I', recv_size)[0]
         data, addr = _socket.recvfrom(buffer_size)
     else:
-        recv_size = _socket.recv(4)
-        buffer_size = struct.unpack('I', recv_size)[0]
+        # recv_size = _socket.recv(4)
+        # buffer_size = struct.unpack('I', recv_size)[0]
         data = _socket.recv(buffer_size)
 
     data = pickle.loads(data, encoding=encoding_type)
@@ -205,14 +206,14 @@ def receive(_socket: socket.socket, encoding_type='utf8') -> str:
 @wrap_exceptions(KeyboardInterrupt)
 def send_to(_socket: socket.socket, data: object, address=tuple()) -> None:
     byte_data = pickle.dumps(data)
-    size = struct.pack('I', len(byte_data))
+    # size = struct.pack('I', len(byte_data))
 
     # UDP
     if _socket.type == 2 and address:
-        _socket.sendto(size, address)
+        # _socket.sendto(size, address)
         _socket.sendto(byte_data, address)
     else:
-        _socket.send(size)
+        # _socket.send(size)
         _socket.send(byte_data)
 
 def get_default_nic():
@@ -237,19 +238,40 @@ def get_default_nic():
                 continue
             return name
 
-def get_host_ip():
-    """ Returns the actual IPaddress from the host """
-    # Source:https://stackoverflow.com/a/30990617/12238188 
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
-        sockfd.connect(('8.8.8.8', 80))
-        return sockfd.getsockname()[0]
+def get_host_ip(ifname: str = "") -> str:
+    """ Returns the actual IP address from the host """
+    # Source: https://stackoverflow.com/a/24196955
+    if not ifname:
+        ifname = get_default_nic()
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname.encode())
+    )[20:24])
 
 def is_alive(address: str, port: int) -> bool:
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+    
     try:
         sockfd.connect((address, port))
-        return True
+        ret = True
     except:
-        sockfd.close()
-        return False
+        ret = False
+    
+    sockfd.close()
+
+    return ret
+
+def get_children_pids(pid: int) -> List[int]:
+    with open(f'/proc/{pid}/task/{pid}/children', 'r') as fp:
+        pids = list(fp)
+    
+    if len(pids): pids = pids[0]
+    
+    return list(map(int, pids.split()))
+
+def in_both(d1: dict, d2: dict) -> list:
+    keys = [*d1.keys(), *d2.keys()]
+    return set([key for key in keys if key in d1 and key in d2])

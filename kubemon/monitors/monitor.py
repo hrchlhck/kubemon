@@ -1,20 +1,15 @@
-from kubemon.config import DEFAULT_DISK_PARTITION
+from kubemon.config import DISK_PARTITION
 from .base_monitor import BaseMonitor
 from ..entities.cpu import CPU
 from ..entities.disk import Disk
 from ..entities.network import Network
-from ..utils import subtract_dicts
-from threading import Thread
-import time
+from ..utils import get_host_ip
 
+import socket
 
-class OSMonitor(BaseMonitor, Thread):
-    def __init__(self, *args, **kwargs):
-        super(OSMonitor, self).__init__(*args, **kwargs)
-        Thread.__init__(self)
-        
-    def __get_data(self):
-        disk = Disk(disk_name=DEFAULT_DISK_PARTITION).get_usage()
+class OSMonitor(BaseMonitor):   
+    def get_stats(self):
+        disk = Disk(disk_name=DISK_PARTITION).get_usage()
         cpu = CPU().get_usage
         net = Network().get_usage
         mem = BaseMonitor.get_memory_usage()
@@ -27,16 +22,10 @@ class OSMonitor(BaseMonitor, Thread):
 
         return data
 
-    def collect(self):
-        data = self.__get_data()
+    def __str__(self) -> str:
+        ip = get_host_ip().replace('.', '_')
+        return f'OSMonitor_{socket.gethostname()}_{ip}'
+    
+    def __repr__(self) -> str:
+        return f'<OSMonitor - {socket.gethostname()} - {get_host_ip()}>'
 
-        time.sleep(self.interval)
-
-        data_new = self.__get_data()
-
-        ret = subtract_dicts(data, data_new)
-
-        return ret
-
-    def run(self) -> None:
-        self.send(function=self.collect, function_args=[])

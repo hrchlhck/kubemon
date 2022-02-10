@@ -1,8 +1,6 @@
-from threading import Thread
-
 from docker.models.containers import Container
 
-from ..utils import subtract_dicts, get_host_ip, get_default_nic
+from ..utils import get_host_ip, get_default_nic
 from .base_monitor import BaseMonitor
 from ..log import create_logger
 
@@ -55,12 +53,15 @@ def parse_proc_net(pid):
 
 LOGGER = create_logger(__name__)
 
-class ProcessMonitor(BaseMonitor, Thread):
-    def __init__(self, container: Container, pid: int, *args, **kwargs):
+class ProcessMonitor(BaseMonitor):
+    __slots__ = ( 
+        '__pid', '__container', 
+        '__name',
+    )
+
+    def __init__(self, container: Container, pid: int):
         self.__container = container
         self.__pid = pid
-        super(ProcessMonitor, self).__init__(*args, **kwargs)
-        Thread.__init__(self)
 
     @property
     def pid(self) -> int:
@@ -71,10 +72,11 @@ class ProcessMonitor(BaseMonitor, Thread):
         return self.__container
 
     def __str__(self) -> str:
-        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.__pid}>'
+        ip = get_host_ip().replace('.', '_')
+        return f'ProcessMonitor_{socket.gethostname()}_{ip}_{self.__container.name}_{self.__pid}'
     
     def __repr__(self) -> str:
-        return f'<{self.name} - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.__pid}>'
+        return f'<ProcessMonitor - {socket.gethostname()} - {get_host_ip()} - {self.__container.name} - {self.__pid}>'
 
     @staticmethod
     def get_cpu_times(process: psutil.Process) -> dict:
@@ -138,36 +140,17 @@ class ProcessMonitor(BaseMonitor, Thread):
         ret.pop('iface')
         return ret
 
-    @classmethod
-    def get_pchild_usage(cls: object, interval: int, pid: int) -> dict:
-        """
-        Merges all dicts returned by the static methods from this class and returns a new dict
-
-        Args:
-            process (int): The PID of the process that you want to get the data
-            interval (int): The seconds that the script will calculate the usage
-        """
+    def get_stats(self) -> dict:
         try:
-            process = psutil.Process(pid=pid)
-            cpu = cls.get_cpu_times(process)
-            io = cls.get_io_counters(process)
-            mem = BaseMonitor.get_memory_usage(pid=pid)
-            net = cls.get_net_usage(process.pid)
+            process = psutil.Process(pid=self.pid)
+            cpu = self.get_cpu_times(process)
+            io = self.get_io_counters(process)
+            mem = BaseMonitor.get_memory_usage(pid=self.pid)
+            net = self.get_net_usage(process.pid)
 
-            # Acts as time.sleep()
-            cpu_percent = process.cpu_percent(interval=interval)
+            ret = {**cpu, **io, **mem, **net}
         except psutil.NoSuchProcess:
-            LOGGER.error('Process not found')
+            ret = dict()
 
-
-        io_new = subtract_dicts(io, cls.get_io_counters(process))
-        cpu_new = subtract_dicts(cpu, cls.get_cpu_times(process))
-        mem_new = subtract_dicts(mem, BaseMonitor.get_memory_usage(pid=pid))
-        net_new = subtract_dicts(net, cls.get_net_usage(process.pid))
-
-        ret = {**io_new, **cpu_new, **net_new, "cpu_percent": cpu_percent, **mem_new}
         return ret
-
-    def run(self) -> None:
-        self.send(function=self.get_pchild_usage, function_args=(self.interval, self.pid), pid=self.pid, container_name=self.container.name)
 

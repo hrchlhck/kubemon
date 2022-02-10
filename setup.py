@@ -13,5 +13,5 @@ setup(
         'kubemon.cli', 'kubemon.monitors',
         'kubemon.exceptions', 'kubemon.entities'
     ],
-    install_requires=['wheel', 'pandas', 'requests', 'psutil', 'docker', 'addict', 'sty']
+    install_requires=['wheel', 'pandas', 'requests', 'psutil', 'docker', 'flask']
 )

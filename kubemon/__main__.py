@@ -31,7 +31,7 @@ if __name__ == "__main__":
         SYSTEMS[args.type].exec(args.command)
     elif args.type == 'cli' and not args.command:
         LOGGER.debug("Executed CLI")
-        SYSTEMS[args.type].start()
+        SYSTEMS[args.type].run()
    
     if args.list:
         print("Available modules:")
