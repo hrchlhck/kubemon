@@ -1,7 +1,7 @@
 from kubemon.collector.commands import COMMAND_CLASSES, HelpCommand
 from kubemon.log import create_logger
 
-from kubemon.config import ( 
+from kubemon.settings import ( 
     DATA_PATH, 
     START_MESSAGE,
     CLI_PORT,
@@ -15,10 +15,9 @@ from kubemon.utils import (
     in_both, save_csv, receive, send_to, subtract_dicts
 )
 
-from typing import Dict as Dict_t, Tuple
+from typing import Dict
 from time import sleep
 from os.path import join as join_path
-from addict import Dict
 from datetime import datetime
 
 import socket
@@ -67,7 +66,7 @@ class Collector(threading.Thread):
         return self.__cli_port
     
     @property
-    def daemons(self) -> Dict_t[str, str]:
+    def daemons(self) -> Dict[str, str]:
         return self.__daemons
 
     @property
@@ -147,8 +146,8 @@ class Collector(threading.Thread):
         try:
             sockfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sockfd.bind((address, port))
-        except:
-            self.logger.error(f"Error while trying to bind socket to port {port}")
+        except Exception as e:
+            self.logger.error(f"Error while trying to bind socket to port {port}. {e}")
             sockfd.close()
             exit(1)
         return sockfd
@@ -255,50 +254,3 @@ class Collector(threading.Thread):
 
                             if self.stop_request:
                                 self.event.set()
-
-
-    def __listen_monitors(self, name: str, client: socket.socket, address: Tuple[str, int]) -> None:
-        """ Listen for monitors. 
-
-        Args:
-            client (socket.socket): Monitor socket
-        
-        Returns: None
-        """
-        self.logger.info(f"Creating new thread for client {name}@{':'.join(map(str, address))}")
-
-        while not self.stop_request:
-            try:
-                data, _ = receive(client)
-
-                if data != None:
-                    self.logger.info(f"Successfully received data from {name}@{':'.join(map(str, address))}")
-                else:
-                    self.logger.info(f"Received nothing from {name}")
-
-                if isinstance(data, dict):
-                    data = Dict(data)
-
-                    data.data.update({'timestamp': datetime.now()})
-                    
-                    dir_name = data.source
-                    if self.dir_name:
-                        dir_name = join_path(self.dir_name, data.source.split("_")[0])
-                    
-                    save_csv(data.data, data.source, dir_name=dir_name)
-                    self.logger.debug(f"Saving data to {str(DATA_PATH)}/{self.dir_name}/{data.source}")
-
-                msg = f"OK - {datetime.now()}"
-                send_to(client, msg)
-                self.logger.debug(f"Sending '{msg}' to client {name}")
-
-            except:
-                addr, port = address
-                self.logger.info(f"Unregistered {name} {addr}:{port}")
-                self.logger.error('What happened??', exc_info=1)
-
-                with self.mutex:
-                    self.instances.pop(name)
-
-                # Killing thread
-                exit(1)
