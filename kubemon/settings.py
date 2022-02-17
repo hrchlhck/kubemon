@@ -1,6 +1,9 @@
 from pathlib import Path
 
+from dataclasses import dataclass
+
 import logging
+import sys
 
 LOGGING_LEVEL = logging.INFO
 
@@ -20,21 +23,20 @@ COLLECT_TASK_PORT = 9884
 DISK_PARTITION = 'sda'
 
 # Directories
-DATA_DIR = Path(f"/home/kubemon/kubemon-data")
+PROJECT_BASE = Path(__file__).absolute().parent.parent
 
 ## Logger path
-LOG_PATH = DATA_DIR / 'logs'
+LOG_PATH = PROJECT_BASE / 'logs'
 
 ## Data path
-DATA_PATH = DATA_DIR / 'data'
-
+DATA_PATH = PROJECT_BASE / 'data'
 
 # Starting message
 START_MESSAGE = "OK"
 
 # Creating base directory
-if not DATA_DIR.exists():
-    DATA_DIR.mkdir(parents=True)
+if not PROJECT_BASE.exists():
+    PROJECT_BASE.mkdir(parents=True)
 
 # Creating log directory
 if not LOG_PATH.exists():
@@ -43,3 +45,14 @@ if not LOG_PATH.exists():
 # Creating data directory
 if not DATA_PATH.exists():
     DATA_PATH.mkdir()
+
+@dataclass
+class Volatile:
+    PROCFS_PATH: str = '/procfs'
+    NUM_DAEMONS: int = 1
+
+    def set_procfs(module: str) -> None:
+        sys.modules[module].PROCFS_PATH = Volatile.PROCFS_PATH
+    
+    def set_num_daemons(n: int) -> None:
+        Volatile.NUM_DAEMONS = n
