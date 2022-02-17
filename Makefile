@@ -6,7 +6,7 @@ build:
 	docker build -t vpemfh7/kubemon:latest .
 
 clean:
-	rm -rf $(shell find . -name __pycache__)
+	sudo rm -rf $(shell find . -name __pycache__)
 
 collector:
 	docker run \
@@ -19,8 +19,25 @@ collector:
 	vpemfh7/kubemon:latest \
 	-t collector
 
+monitor:
+	docker run \
+	-p 9822:9822/tcp \
+	-v /proc:/procfs:ro \
+	-v /sys:/sys:ro \
+	-v /var/lib/docker:/var/lib/docker:ro \
+	-v /var/run/docker.sock:/var/run/docker.sock \
+	-v /etc/hostname:/etc/host_hostname:ro \
+	--privileged \
+	--rm \
+	--name monitor \
+	-d \
+	vpemfh7/kubemon:latest \
+	-H $(host) \
+	-t daemon \
+	-n 1 \
+
 server:
-	sudo -b su -c "venv/bin/python -m kubemon -t collector >> collector.out 2>&1 &"
+	sudo su -c "venv/bin/python -m kubemon -t collector -H 192.168.15.9 -n 1 >> collector.out 2>&1 &"
 
 stop_collector:
 	docker kill $(shell docker ps | grep collector | awk '{print $$1}')
@@ -32,4 +49,4 @@ kill:
 	sudo kill -9 $(shell ps aux | grep kubemon | awk {'print $$2'})
 
 cli:
-	sudo venv/bin/python -m kubemon -t cli -H $(host)
+	sudo venv/bin/python -m kubemon -t cli -p 9880 -H $(host)
