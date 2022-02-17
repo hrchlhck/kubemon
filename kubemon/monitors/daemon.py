@@ -4,17 +4,17 @@ from kubemon.utils import (
     get_children_pids, 
     get_containers, 
     get_container_pid, 
-    get_host_ip, 
+    get_host_ip,
+    gethostname, 
     is_alive, 
-    receive,
-    send_to
+    send_to,
+    pid_exists,
 )
-from kubemon.config import (
+from kubemon.settings import (
     MONITOR_PORT,
     COLLECTOR_HEALTH_CHECK_PORT,
     COLLECTOR_INSTANCES_CHECK_PORT,
-    DAEMON_PORT,
-
+    Volatile
 ) 
 from . import (
     OSMonitor, 
@@ -22,13 +22,13 @@ from . import (
     ProcessMonitor
 )
 
-from psutil import pid_exists
 from docker import from_env
 from time import sleep as time_sleep
 
+import psutil
+
 import threading
 import socket
-import sys
 import flask
 
 __all__ = ['Kubemond']
@@ -40,6 +40,8 @@ class Kubemond(threading.Thread):
     """ Kubemon Daemon Class. """
 
     def __init__(self, address: str, port=MONITOR_PORT):
+        Volatile.set_procfs(psutil.__name__)
+
         self.__address = address
         self.__port = port
         self.__mutex = threading.Lock()
@@ -77,7 +79,7 @@ class Kubemond(threading.Thread):
                 sockfd.connect((self.address, COLLECTOR_INSTANCES_CHECK_PORT))
                 self.logger.info('Connected to collector')
 
-                name = socket.gethostname()
+                name = gethostname()
                 address = str(get_host_ip())
                 msg = (name, address)
 
@@ -93,6 +95,7 @@ class Kubemond(threading.Thread):
     @staticmethod
     @APP.route('/')
     def _init_monitors() -> None:
+        LOGGER.info((Volatile.PROCFS_PATH, Volatile.NUM_DAEMONS))
         instances = docker_instances() + process_instances() + [OSMonitor()]
         
         instances = {str(i): i.get_stats() for i in instances}
@@ -102,10 +105,10 @@ class Kubemond(threading.Thread):
 def docker_instances() -> list:
     monitors = list()
     pods = Pod.list_pods(namespace='*')
-
+    
     for p in pods:
         for c in p.containers:
-            monitor = DockerMonitor(c, p, get_container_pid(c))
+            monitor = DockerMonitor(c, p, get_container_pid(c.id))
             monitors.append(monitor)
     
     return monitors

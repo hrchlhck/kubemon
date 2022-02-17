@@ -1,31 +1,24 @@
-from kubemon.config import DISK_PARTITION
-from .base_monitor import BaseMonitor
-from ..entities.cpu import CPU
-from ..entities.disk import Disk
-from ..entities.network import Network
-from ..utils import get_host_ip
+from kubemon.settings import DISK_PARTITION
+from kubemon.entities import (
+    CPU, Memory, 
+    Network, Disk
+)
+from kubemon.utils import get_host_ip, gethostname
 
-import socket
-
-class OSMonitor(BaseMonitor):   
+class OSMonitor:
     def get_stats(self):
-        disk = Disk(disk_name=DISK_PARTITION).get_usage()
-        cpu = CPU().get_usage
-        net = Network().get_usage
-        mem = BaseMonitor.get_memory_usage()
-        data = {
-            **cpu,
-            **mem,
-            **disk.infos,
-            **net,
-        }
+        _type = 'os'
+        disk = Disk(DISK_PARTITION, _type)
+        cpu = CPU(_type)
+        net = Network(_type)
+        mem = Memory(_type)
 
-        return data
+        return {**cpu(),**mem(),**disk(DISK_PARTITION),**net()}
 
     def __str__(self) -> str:
         ip = get_host_ip().replace('.', '_')
-        return f'OSMonitor_{socket.gethostname()}_{ip}'
+        return f'OSMonitor_{gethostname()}_{ip}'
     
     def __repr__(self) -> str:
-        return f'<OSMonitor - {socket.gethostname()} - {get_host_ip()}>'
+        return f'<OSMonitor - {gethostname()} - {get_host_ip()}>'
 
