@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kubemon-monitor
+  namespace: kubemon
+  labels:
+    app: kubemon
+spec:
+  selector:
+    matchLabels:
+      app: kubemon
+  template:
+    metadata:
+      labels:
+        app: kubemon
+    spec:
+      containers:
+        - name: kubemon-monitor
+          image: vpemfh7/kubemon:latest
+          args: ["-t", "daemon", "-H", "collector", "-p", "9822"]
+          securityContext:
+            privileged: true
+            readOnlyRootFilesystem: true
+          volumeMounts:
+          - name: procfs
+            mountPath: /procfs
+            readOnly: true
+          - name: docker
+            mountPath: /var/lib/docker
+            readOnly: true
+          - name: sys
+            mountPath: /sys
+            readOnly: true
+          - name: docker-sock
+            mountPath: /var/run/docker.sock
+            readOnly: true
+          - name: hostname
+            mountPath: /etc/host_hostname
+            readOnly: true
+          ports:
+            - name: http
+              containerPort: 9822
+      volumes:
+      - name: sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: docker
+        hostPath:
+          path: /var/lib/docker
+          type: Directory
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: procfs
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: hostname
+        hostPath:
+          path: /etc/hostname
+          type: File
