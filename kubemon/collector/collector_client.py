@@ -1,14 +1,12 @@
 from kubemon.collector.commands import IsAliveCommand, COMMAND_CLASSES
 from kubemon.utils import receive, send_to
-from kubemon.config import CONFIGURATION
+from kubemon.settings import COLLECTOR_HEALTH_CHECK_PORT
 
 from typing import Any
 
 import socket
 
 __all__ = ["CollectorClient"]
-
-HEALTHCHECK_PORT = CONFIGURATION['COLLECTOR_HEALTH_CHECK_PORT']
 
 class ExecCommand:
     def __init__(self, address: str, port: int, cmd: str):
@@ -30,7 +28,7 @@ class ExecCommand:
     
     def exec(self, *args) -> Any:
         if self.cmd == 'alive':
-            data = IsAliveCommand(self.address, HEALTHCHECK_PORT).execute()
+            data = IsAliveCommand(self.address, COLLECTOR_HEALTH_CHECK_PORT).execute()
             return data
         
         composed_cmd = self.cmd + " " + " ".join(map(str, args))
@@ -72,7 +70,7 @@ class CollectorClient:
                 cmd = input(">>> ")
                 
                 if cmd == "alive":
-                    data = IsAliveCommand(self.address, HEALTHCHECK_PORT).execute()
+                    data = IsAliveCommand(self.address, COLLECTOR_HEALTH_CHECK_PORT).execute()
                     print(data)
                     continue
 

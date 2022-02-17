@@ -1,10 +1,9 @@
-from kubemon.utils import receive, send_to, is_alive
-from kubemon.config import CONFIGURATION, DATA_PATH, MONITOR_PORT, NUM_DAEMONS, START_MESSAGE
+from kubemon.utils import send_to, is_alive
+from kubemon.settings import DATA_PATH, MONITOR_PORT, START_MESSAGE
 from typing import Dict
 from datetime import datetime
 
 import dataclasses
-import socket
 import requests
 import abc
 
@@ -67,10 +66,12 @@ class IsReadyCommand(Command):
     """
 
     def execute(self) -> str:
+        from kubemon.settings import Volatile
+        
         collector = self._collector
         collector.logger.info(collector.collect_status)
 
-        return not collector.stop_request and len(collector) == NUM_DAEMONS
+        return not collector.stop_request and len(collector) == Volatile.NUM_DAEMONS
 
 class ConnectedDaemonsCommand(Command):
     """ Lists all the daemons (hosts) connected.
