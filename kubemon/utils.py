@@ -1,14 +1,17 @@
-from subprocess import check_output
 from functools import reduce
 from os.path import join, isfile
 from pathlib import Path
 from typing import List
 from requests import get
-from .config import DATA_PATH
 from .decorators import wrap_exceptions
 from .dataclasses import Pair
 from time import sleep
 
+from kubemon.settings import DATA_PATH, Volatile
+
+from docker.models.containers import Container
+
+import psutil
 import docker
 import socket
 import csv
@@ -20,6 +23,7 @@ import fcntl
 __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'join_url', 'send_data',
            'save_csv', 'format_name', 'get_containers', 'get_container_pid', 'try_connect', 'receive', 'send_to']
 
+Volatile.set_procfs(psutil.__name__)
 
 def subtract_dicts(dict1: dict, dict2: dict, operation=lambda x, y: x-y) -> dict:
     """ Subtracts values from dict1 and dict2 """
@@ -32,8 +36,12 @@ def subtract_dicts(dict1: dict, dict2: dict, operation=lambda x, y: x-y) -> dict
 
 def merge_dict(*dicts: List[dict]) -> dict:
     """ Merges multiple dictionaries """
-    assert dicts != None
-    assert all(i for i in dicts if isinstance(i, dict)) == True
+    if not len(dicts):
+        raise ValueError('Must specify dictionaries')
+    
+    if not all(i for i in dicts if isinstance(i, dict)):
+        raise TypeError('All arguments specified must be \'dict\'')
+
     ret = dict()
     for d in dicts:
         ret.update(d)
@@ -150,14 +158,35 @@ def get_containers(client: docker.client.DockerClient, namespace='', to_tuple=Fa
     return list(map(lambda container: Pair(container, container.name), filter(_filter, containers)))
 
 
-def get_container_pid(container):
-    get_pid = lambda x: x['State']['Pid']
+def get_container_pid(container: Container):
+    if isinstance(container, Container):
+        path = f'/var/lib/docker/containers/{container.id}/config.v2.json'
+    elif isinstance(container, str):
+        path = f'/var/lib/docker/containers/{container}/config.v2.json'
+    else:
+        raise TypeError('Argument must be of type docker.models.containers.Container or str')
 
-    with open(f'/var/lib/docker/containers/{container.id}/config.v2.json', 'r') as fp:
+    with open(path, 'r') as fp:
         data = fp.read()
-        data = json.loads(data)
-        return get_pid(data)
+    data = json.loads(data)
+    return data['State']['Pid']
 
+def get_container_name(container: Container):
+    if isinstance(container, Container):
+        path = f'/var/lib/docker/containers/{container.id}/config.v2.json'
+    elif isinstance(container, str):
+        path = f'/var/lib/docker/containers/{container}/config.v2.json'
+    else:
+        raise TypeError('Argument must be of type docker.models.containers.Container or str')
+
+    with open(path, 'r') as fp:
+        data = fp.read()
+
+    data = json.loads(data)
+
+    name = data['Name']
+
+    return name
 
 def try_connect(addr: str, port: int, _socket: socket.socket, timeout: int) -> None:
     """ 
@@ -220,7 +249,7 @@ def get_default_nic():
     """ Function to get the default network interface in a Linux-based system. """
     # Source: https://stackoverflow.com/a/20925510/12238188
 
-    route = '/proc/net/route'
+    route = f'{psutil.PROCFS_PATH}/net/route'
     with open(route, mode='r') as fd:
         # Removing spaces and separating fields
         lines = list(map(lambda x: x.strip().split(), fd))
@@ -265,13 +294,24 @@ def is_alive(address: str, port: int) -> bool:
     return ret
 
 def get_children_pids(pid: int) -> List[int]:
-    with open(f'/proc/{pid}/task/{pid}/children', 'r') as fp:
+    with open(f'{psutil.PROCFS_PATH}/{pid}/task/{pid}/children', 'r') as fp:
         pids = list(fp)
     
     if len(pids): pids = pids[0]
+    else:
+        pids = ''
     
     return list(map(int, pids.split()))
 
 def in_both(d1: dict, d2: dict) -> list:
     keys = [*d1.keys(), *d2.keys()]
     return set([key for key in keys if key in d1 and key in d2])
+
+def gethostname() -> str:
+    if Path('/etc/host_hostname').exists():
+        with open('/etc/host_hostname', mode='r') as fp:
+            return fp.read().strip()
+    return socket.gethostname()
+
+def pid_exists(pid: int) -> bool:
+    return pid in psutil.pids()
