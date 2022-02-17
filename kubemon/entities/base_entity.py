@@ -1,7 +1,9 @@
-from ..exceptions.platform_exception import NotLinuxException
+from kubemon.exceptions.platform_exception import NotLinuxException
+
+from abc import abstractmethod, ABC
 from platform import platform
 
-class BaseEntity:
+class BaseEntity(ABC):
     """ 
     Base class to represent a hardware component e.g. CPU, Hard Disk, RAM memory, network interfaces, etc. 
     
@@ -11,11 +13,16 @@ class BaseEntity:
     
     __platform = platform()
 
-    def __init__(self):
+    def __init__(self, monitor_type: str):
+        self._monitor_type = monitor_type
         self.__check_os()
 
+    @abstractmethod
     def get_usage(self):
         """ Abstract method """
+    
+    def __call__(self, *args):
+        return self.get_usage(*args)
 
     def __check_os(self):
         if not "Linux" in self.__platform:
