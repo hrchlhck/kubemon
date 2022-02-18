@@ -1,5 +1,6 @@
+from typing import List
 from kubemon.log import create_logger
-from kubemon.pod import Pod
+from kubemon.pod import list_pods
 from kubemon.utils import (
     get_children_pids, 
     get_containers, 
@@ -22,11 +23,10 @@ from . import (
     ProcessMonitor
 )
 
-from docker import from_env
 from time import sleep as time_sleep
 
 import psutil
-
+import docker
 import threading
 import socket
 import flask
@@ -96,15 +96,21 @@ class Kubemond(threading.Thread):
     @APP.route('/')
     def _init_monitors() -> None:
         LOGGER.info((Volatile.PROCFS_PATH, Volatile.NUM_DAEMONS))
-        instances = docker_instances() + process_instances() + [OSMonitor()]
+        client = docker.from_env()
+        instances = docker_instances(client) \
+                    + process_instances(client) \
+                    + [OSMonitor()]
         
         instances = {str(i): i.get_stats() for i in instances}
 
         return flask.jsonify(instances)
 
-def docker_instances() -> list:
+def docker_instances(client: docker.client.DockerClient) -> List[DockerMonitor]:
+    if not isinstance(client, docker.client.DockerClient):
+        raise TypeError(f'Must specify the DockerClient object instead of \'{type(client).__name__}\'')
+    
     monitors = list()
-    pods = Pod.list_pods(namespace='*')
+    pods = list_pods(namespace='*')
     
     for p in pods:
         for c in p.containers:
@@ -113,8 +119,10 @@ def docker_instances() -> list:
     
     return monitors
 
-def process_instances() -> list:
-    client = from_env()
+def process_instances(client: docker.client.DockerClient) -> List[ProcessMonitor]:
+    if not isinstance(client, docker.client.DockerClient):
+        raise TypeError(f'Must specify the DockerClient object instead of \'{type(client).__name__}\'')
+
     containers = get_containers(client)
     container_pids = [(get_container_pid(c), c) for c in containers]
     monitors = list()

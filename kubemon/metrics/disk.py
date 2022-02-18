@@ -1,7 +1,7 @@
 from psutil import NoSuchProcess
 
-from . import label
 from ._docker import _load_metrics
+from kubemon.decorators import label
 from kubemon.settings import Volatile
 
 LABEL = 'disk'

@@ -1,6 +1,6 @@
 from kubemon.utils import filter_dict, pid_exists
 from kubemon.settings import Volatile
-from . import label
+from kubemon.decorators import label
 from ._docker import _load_metrics
 
 from psutil import NoSuchProcess

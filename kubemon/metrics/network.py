@@ -1,8 +1,7 @@
 from typing import Dict
 from psutil import NoSuchProcess
 
-from . import label
-
+from kubemon.decorators import label
 from kubemon.settings import Volatile
 from kubemon.utils import get_default_nic, pid_exists
 

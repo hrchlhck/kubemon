@@ -1,6 +1,6 @@
 from kubemon.settings import Volatile
+from kubemon.decorators import label
 from ._docker import _load_metrics
-from . import label
 
 import psutil
 
