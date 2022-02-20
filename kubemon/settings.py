@@ -24,19 +24,20 @@ DISK_PARTITION = 'sda'
 
 # Directories
 PROJECT_BASE = Path(__file__).absolute().parent.parent
+DATA_DIR = PROJECT_BASE / 'kubemon-output'
 
 ## Logger path
-LOG_PATH = PROJECT_BASE / 'logs'
+LOG_PATH = DATA_DIR / 'logs'
 
 ## Data path
-DATA_PATH = PROJECT_BASE / 'data'
+DATA_PATH = DATA_DIR / 'data'
 
 # Starting message
 START_MESSAGE = "OK"
 
 # Creating base directory
-if not PROJECT_BASE.exists():
-    PROJECT_BASE.mkdir(parents=True)
+if not DATA_DIR.exists():
+    DATA_DIR.mkdir(parents=True)
 
 # Creating log directory
 if not LOG_PATH.exists():

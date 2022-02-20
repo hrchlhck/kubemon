@@ -1,11 +1,10 @@
-from kubemon.cli.commands import SYSTEMS
 from kubemon.log import create_logger
-from kubemon.config import LOGGING_LEVEL
+from kubemon.exceptions.platform_exception import NotLinuxException
+from kubemon.cli import *
+from kubemon.merge import merge
+from kubemon.collector.commands import COMMAND_CLASSES
 
-from .exceptions.platform_exception import NotLinuxException
-from .cli import *
-from .merge import merge
-from .collector.commands import COMMAND_CLASSES
+import kubemon.settings as settings
 
 import sys
 
@@ -14,25 +13,36 @@ if __name__ == "__main__":
     if 'win' in sys.platform:
         raise NotLinuxException("Kubemon is only available for Linux-based Operating Systems. Sorry.")
         
-    LOGGER = create_logger(__name__, level=LOGGING_LEVEL)
+    LOGGER = create_logger(__name__, level=settings.LOGGING_LEVEL)
+
+    args = parser.parse_args()
 
     if args.type == 'merge':
         if not args.files:
             print("Merge type requires --file/-f")
         else:
             merge(*args.files)
+    
+    if not args.from_ctnr:
+        settings.Volatile.PROCFS_PATH = '/proc'
+        LOGGER.info("PROCFS_PATH set to %s", '/proc')
+    
+    if args.num_daemons:
+        settings.Volatile.NUM_DAEMONS = int(args.num_daemons)
+        LOGGER.info("NUM_DAEMONS set to %s", args.num_daemons)
 
-    if args.type in MODULES:
-        LOGGER.debug(f"Starting application {args.type}")
-        SYSTEMS[args.type].start()
+    module = get_module(args.type, args.host, int(args.port))
 
-    if args.type == 'cli' and args.command:
-        LOGGER.debug("Executed CLI")
-        SYSTEMS[args.type].exec(args.command)
-    elif args.type == 'cli' and not args.command:
-        LOGGER.debug("Executed CLI")
-        SYSTEMS[args.type].run()
-   
+    if module == None:
+        LOGGER.info('Module %s does not exist', type(module))
+        exit()
+
+    if module != None and args.type == 'cli':
+        module.run()
+
+    if module != None and not args.type == 'cli':
+        module.start()
+  
     if args.list:
         print("Available modules:")
         LOGGER.debug("Listing modules")
