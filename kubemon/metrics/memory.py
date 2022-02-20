@@ -1,4 +1,5 @@
-from kubemon.utils import filter_dict, pid_exists
+from kubemon.utils.data import filter_dict
+from kubemon.utils.process import pid_exists
 from kubemon.settings import Volatile
 from kubemon.decorators import label
 from ._docker import _load_metrics

@@ -1,18 +1,16 @@
 from psutil import NoSuchProcess
+from typing import Generator
 
 from ._docker import _load_metrics
 from kubemon.decorators import label
 from kubemon.settings import Volatile
-
-LABEL = 'disk'
-
-from typing import Generator
-
-from kubemon.utils import pid_exists
+from kubemon.utils.process import pid_exists
 
 import psutil
 
 Volatile.set_procfs(psutil.__name__)
+
+LABEL = 'disk'
 
 class Partition:
     """ Class for a simple representation of a disk partition on a Linux based system.

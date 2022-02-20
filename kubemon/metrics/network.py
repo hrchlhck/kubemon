@@ -3,7 +3,8 @@ from psutil import NoSuchProcess
 
 from kubemon.decorators import label
 from kubemon.settings import Volatile
-from kubemon.utils import get_default_nic, pid_exists
+from kubemon.utils.networking import get_default_nic
+from kubemon.utils.process import pid_exists
 
 import psutil
 import re

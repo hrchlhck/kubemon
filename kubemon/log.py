@@ -1,5 +1,6 @@
 import logging
-from .config import LOG_PATH, LOGGING_LEVEL
+
+from .settings import LOG_PATH, LOGGING_LEVEL
 
 __all__ = ['create_logger']
 

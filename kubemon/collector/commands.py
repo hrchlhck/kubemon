@@ -1,13 +1,12 @@
-from kubemon.utils import send_to, is_alive
+from kubemon.utils.networking import send_to, is_alive
 from kubemon.settings import DATA_PATH, MONITOR_PORT, START_MESSAGE
+
 from typing import Dict
 from datetime import datetime
 
-import dataclasses
 import requests
 import abc
 
-@dataclasses.dataclass
 class Command(abc.ABC):
     def __init__(self, collector,):
         self._collector = collector

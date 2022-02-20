@@ -1,16 +1,13 @@
-from typing import List
+from functools import wraps
+from typing import Any, Callable, List
+from kubemon.dataclasses import Pod
 from kubemon.log import create_logger
 from kubemon.pod import list_pods
-from kubemon.utils import (
-    get_children_pids, 
-    get_containers, 
-    get_container_pid, 
-    get_host_ip,
-    gethostname, 
-    is_alive, 
-    send_to,
-    pid_exists,
-)
+
+from kubemon.utils.process import get_children_pids, pid_exists
+from kubemon.utils.containers import get_containers, get_container_pid
+from kubemon.utils.networking import get_host_ip, gethostname, is_alive, send_to
+
 from kubemon.settings import (
     MONITOR_PORT,
     COLLECTOR_HEALTH_CHECK_PORT,
@@ -105,24 +102,30 @@ class Kubemond(threading.Thread):
 
         return flask.jsonify(instances)
 
-def docker_instances(client: docker.client.DockerClient) -> List[DockerMonitor]:
-    if not isinstance(client, docker.client.DockerClient):
-        raise TypeError(f'Must specify the DockerClient object instead of \'{type(client).__name__}\'')
-    
-    monitors = list()
-    pods = list_pods(namespace='*')
-    
-    for p in pods:
-        for c in p.containers:
-            monitor = DockerMonitor(c, p, get_container_pid(c.id))
-            monitors.append(monitor)
-    
-    return monitors
+def client_error(func: Callable) -> Callable:
+    @wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        if not len(args):
+            raise ValueError('Missing argument \'client\'')
 
+        client = args[0]
+        if not isinstance(client, docker.client.DockerClient):
+            raise TypeError(f'Must specify the DockerClient object instead of \'{type(client).__name__}\'')
+
+        ret = func(*args, **kwargs)
+        return ret
+    return wrapper
+
+@client_error
+def docker_instances(client: docker.client.DockerClient) -> List[DockerMonitor]:   
+    to_monitor = lambda c: DockerMonitor(c.container) if isinstance(c, Pod) else DockerMonitor(c)
+
+    pods = list_pods(client=client, from_k8s=False)
+
+    return list(map(to_monitor, pods))    
+
+@client_error
 def process_instances(client: docker.client.DockerClient) -> List[ProcessMonitor]:
-    if not isinstance(client, docker.client.DockerClient):
-        raise TypeError(f'Must specify the DockerClient object instead of \'{type(client).__name__}\'')
-
     containers = get_containers(client)
     container_pids = [(get_container_pid(c), c) for c in containers]
     monitors = list()

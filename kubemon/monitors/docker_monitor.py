@@ -3,11 +3,9 @@ from kubemon.entities import (
     CPU, Network,
     Memory, Disk
 )
-from kubemon.utils import (
-    subtract_dicts, filter_dict, 
-    get_container_pid, get_host_ip,
-    gethostname
-)
+from kubemon.utils.data import subtract_dicts, filter_dict
+from kubemon.utils.containers import get_container_pid
+from kubemon.utils.networking import gethostname, get_host_ip
 
 from kubemon.log import create_logger
 from kubemon.pod import *
@@ -111,13 +109,12 @@ class DockerMonitor:
         '_metrics', '_paths'
     )
 
-    def __init__(self, container: Container, pod: Pod, pid: int, kubernetes=True, stats_path="/sys/fs/cgroup"):
+    def __init__(self, container: Container, stats_path="/sys/fs/cgroup"):
         Volatile.set_procfs(psutil.__name__)
         
         _type = 'docker'
         self.__container = container
-        self.__pid = pid
-        self.__pod = pod
+        self.__pid = get_container_pid(container)
         self.__stats_path = stats_path
         self._metrics = {
             'cpu': CPU(_type),
@@ -126,14 +123,7 @@ class DockerMonitor:
             'memory': Memory(_type)
         }
 
-        self._paths = self._parse_cgroup(pid, cgroup_path=stats_path)
-
-        if kubernetes:
-            self.__pods = Pod.list_pods(namespace="*")
-
-    @property
-    def pods(self):
-        return self.__pods
+        self._paths = self._parse_cgroup(self.__pid, cgroup_path=stats_path)
 
     @property
     def stats_path(self):
@@ -187,43 +177,21 @@ class DockerMonitor:
 
     @log(logger=LOGGER)
     def get_memory_usage(self) -> dict:
-        """ 
-        Get the memory usage of a given container within a pod 
-
-        Args:
-            pod (Pod): Pod container object
-            container (Pair): Container pair namedtuple to be monitored
-            _alt_path (str): Alternative path to be gathering data
-        """
+        """ Get the memory usage of a given container within a pod """
         path = self.get_path(cgroup_controller='memory', stat='memory.stat')
 
         return self._metrics['memory'](path)
 
     @log(logger=LOGGER)
     def get_disk_usage(self) -> dict:
-        """ 
-        Get the disk usage of a given container within a pod 
-
-        Args:
-            pod (Pod): Pod container object
-            container (Pair): Container pair namedtuple to be monitored
-            disk_name (str): Name of the disk to collect major and minor device drivers (only for parsing purposes)
-            _alt_path (str): Alternative path to be gathering data
-        """
+        """ Get the disk usage of a given container within a pod """
         path = self.get_path(cgroup_controller='blkio', stat='blkio.throttle.io_service_bytes')
        
         return self._metrics['disk'](path)
 
     @log(logger=LOGGER)
     def get_cpu_times(self) -> dict:
-        """ 
-        Get the CPU usage of a given container within a pod 
-
-        Args:
-            pod (Pod): Pod container object
-            container (Pair): Container pair namedtuple to be monitored
-            _alt_path (str): Alternative path to be gathering data
-        """
+        """ Get the CPU usage of a given container within a pod """
         path_cpuacct = self.get_path(cgroup_controller='cpu,cpuacct', stat='cpuacct.stat')
         path_cpu = self.get_path(cgroup_controller='cpu,cpuacct', stat='cpu.stat')
 
@@ -231,28 +199,18 @@ class DockerMonitor:
 
     @log(logger=LOGGER)
     def get_net_usage(self) -> dict:
-        """ 
-        Get network usage of a given container within a pod 
+        """ Get network usage of a given container within a pod 
 
         To understand why not gather information from cgroups, 
         please refer to https://docs.docker.com/config/containers/runmetrics/#network-metrics
 
-        Args:
-            container (Pair): Container pair namedtuple to be monitored
         """
-        pid = get_container_pid(self.container.id)
 
-        return self._metrics['network'](pid)
+        return self._metrics['network'](self.pid)
 
     @log(logger=LOGGER)
     def get_stats(self) -> dict:
-        """ 
-        Get all metrics of a given container within a pod 
-
-        Args:
-            pod (Pod): Pod container object
-            container (Pair): Container pair namedtuple to be monitored
-        """
+        """ Get all metrics of a given container within a pod """
         cpu = self.get_cpu_times()
         memory = self.get_memory_usage()
         network = self.get_net_usage()

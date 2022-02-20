@@ -1,5 +1,5 @@
 from kubemon.collector.commands import IsAliveCommand, COMMAND_CLASSES
-from kubemon.utils import receive, send_to
+from kubemon.utils.networking import receive, send_to
 from kubemon.settings import COLLECTOR_HEALTH_CHECK_PORT
 
 from typing import Any

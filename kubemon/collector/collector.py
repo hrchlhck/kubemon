@@ -11,9 +11,10 @@ from kubemon.settings import (
     COLLECTOR_INSTANCES_CHECK_PORT,
     MONITOR_PORT
 )
-from kubemon.utils import (
-    in_both, save_csv, receive, send_to, subtract_dicts
+from kubemon.utils.data import (
+    in_both, save_csv, subtract_dicts
 )
+from kubemon.utils.networking import receive, send_to
 
 from typing import Dict
 from time import sleep

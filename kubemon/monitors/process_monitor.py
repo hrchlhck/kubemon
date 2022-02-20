@@ -1,7 +1,7 @@
 from docker.models.containers import Container
 
 from kubemon.settings import DISK_PARTITION, Volatile
-from kubemon.utils import get_host_ip, gethostname
+from kubemon.utils.networking import get_host_ip, gethostname
 from kubemon.log import create_logger
 from kubemon.entities import (
     CPU, Memory,

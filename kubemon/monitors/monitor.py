@@ -3,7 +3,7 @@ from kubemon.entities import (
     CPU, Memory, 
     Network, Disk
 )
-from kubemon.utils import get_host_ip, gethostname
+from kubemon.utils.networking import get_host_ip, gethostname
 
 class OSMonitor:
     def get_stats(self):
