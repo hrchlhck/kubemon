@@ -1,18 +1,21 @@
-import dataclasses
-import socket
+from dataclasses import dataclass
+
 from docker.models.containers import Container
 
-__all__ = ['Pair', 'Client']
+__all__ = ['Pair', 'Pod']
 
-@dataclasses.dataclass
-class Client:
-    """ Dataclass to represent a socket object returned by socket.accept() """
-    name: str
-    socket_obj: socket.socket
-    address: tuple
-
-@dataclasses.dataclass
+@dataclass
 class Pair:
     """ Dataclass to represent a container Pair """
     container: Container
     name: str
+
+@dataclass
+class Pod:
+    """ Dataclass to represent a pod from kubernetes """
+    namespace: str
+    name: str
+    container: str
+    pod_id: str
+    container_id: str
+    container: Container
