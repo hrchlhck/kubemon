@@ -1,7 +1,6 @@
 from kubemon.log import create_logger
 from kubemon.exceptions.platform_exception import NotLinuxException
 from kubemon.cli import *
-from kubemon.merge import merge
 from kubemon.collector.commands import COMMAND_CLASSES
 
 import kubemon.settings as settings
@@ -16,15 +15,9 @@ if __name__ == "__main__":
     LOGGER = create_logger(__name__, level=settings.LOGGING_LEVEL)
 
     args = parser.parse_args()
-
-    if args.type == 'merge':
-        if not args.files:
-            print("Merge type requires --file/-f")
-        else:
-            merge(*args.files)
     
     if not args.from_ctnr:
-        settings.Volatile.PROCFS_PATH = '/proc'
+        settings.Volatile.set_procfs()
         LOGGER.info("PROCFS_PATH set to %s", '/proc')
     
     if args.num_daemons:

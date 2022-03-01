@@ -4,15 +4,15 @@ metadata:
   name: kubemon-monitor
   namespace: kubemon
   labels:
-    app: kubemon
+    app: monitor
 spec:
   selector:
     matchLabels:
-      app: kubemon
+      app: monitor
   template:
     metadata:
       labels:
-        app: kubemon
+        app: monitor
     spec:
       containers:
         - name: kubemon-monitor
@@ -20,7 +20,6 @@ spec:
           args: ["-t", "daemon", "-H", "collector", "-p", "9822"]
           securityContext:
             privileged: true
-            readOnlyRootFilesystem: true
           volumeMounts:
           - name: procfs
             mountPath: /procfs

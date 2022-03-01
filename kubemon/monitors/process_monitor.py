@@ -1,4 +1,5 @@
 from docker.models.containers import Container
+from kubemon.monitors.base import BaseMonitor
 
 from kubemon.settings import DISK_PARTITION, Volatile
 from kubemon.utils.networking import get_host_ip, gethostname
@@ -12,11 +13,13 @@ import psutil
 
 LOGGER = create_logger(__name__)
 
-class ProcessMonitor:
+class ProcessMonitor(BaseMonitor):
     __slots__ = ( 
         '__pid', '__container', 
         '__name', '__metrics'
     )
+
+    _type = 'process'
 
     def __init__(self, container: Container, pid: int):
         Volatile.set_procfs(psutil.__name__)
@@ -26,14 +29,13 @@ class ProcessMonitor:
             LOGGER.info('pid %s not exist', pid)
             exit(0)
 
-        _type = 'process'
         self.__container = container
         self.__pid = pid
         self.__metrics = {
-            'cpu': CPU(_type),
-            'memory': Memory(_type),
-            'disk': Disk(DISK_PARTITION, _type),
-            'network': Network(_type),
+            'cpu': CPU(self._type),
+            'memory': Memory(self._type),
+            'disk': Disk(DISK_PARTITION, self._type),
+            'network': Network(self._type),
         }
 
     @property

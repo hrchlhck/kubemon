@@ -1,17 +1,26 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+
+VERSION = '2.0.0'
+SHORT_DESCRIPTION = 'A tool for distributed container monitoring over Kubernetes'
+REQUIRES = [
+    'requests', 'psutil', 
+    'docker', 'flask',
+]
+
+def _load_readme() -> str:
+    with open('README.md', 'r') as fp:
+        return fp.read()
 
 setup(
     name='kubemon',
-    version='2.0.0',
-    descripton='A tool for distributed container monitoring over Kubernetes',
+    version=VERSION,
+    descripton=SHORT_DESCRIPTION,
+    long_description=_load_readme(),
+    long_description_content_type='text/markdown',
     url='https://github.com/hrchlhck/kubemon',
-    author='Pedro (vpemfh7) Horchulhack',
+    author='Pedro Horchulhack',
     author_email='pedro.horchulhack@ppgia.pucpr.br',
     license='MIT',
-    packages=[
-        'kubemon', 'kubemon.collector',
-        'kubemon.cli', 'kubemon.monitors',
-        'kubemon.exceptions', 'kubemon.entities'
-    ],
-    install_requires=['wheel', 'pandas', 'requests', 'psutil', 'docker', 'flask']
+    packages=find_packages(),
+    install_requires=REQUIRES
 )

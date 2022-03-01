@@ -1,3 +1,4 @@
+from kubemon.monitors.base import BaseMonitor
 from kubemon.settings import DISK_PARTITION, Volatile
 from kubemon.entities import (
     CPU, Network,
@@ -101,7 +102,7 @@ def log(logger: logging.Logger):
         return wrapper
     return decorator
 
-class DockerMonitor:
+class DockerMonitor(BaseMonitor):
     __slots__ = ( 
         '__pid', '__container', 
         '__pod', '__pods', 
@@ -109,18 +110,19 @@ class DockerMonitor:
         '_metrics', '_paths'
     )
 
+    _type = 'docker'
+
     def __init__(self, container: Container, stats_path="/sys/fs/cgroup"):
         Volatile.set_procfs(psutil.__name__)
         
-        _type = 'docker'
         self.__container = container
         self.__pid = get_container_pid(container)
         self.__stats_path = stats_path
         self._metrics = {
-            'cpu': CPU(_type),
-            'network': Network(_type),
-            'disk': Disk(DISK_PARTITION, _type),
-            'memory': Memory(_type)
+            'cpu': CPU(self._type),
+            'network': Network(self._type),
+            'disk': Disk(DISK_PARTITION, self._type),
+            'memory': Memory(self._type)
         }
 
         self._paths = self._parse_cgroup(self.__pid, cgroup_path=stats_path)

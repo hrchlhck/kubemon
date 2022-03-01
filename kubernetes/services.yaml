@@ -18,6 +18,18 @@ spec:
   - name: instances-check
     port: 9883
     targetPort: 9883
-  - name: collect-task
-    port: 9884
-    targetPort: 9884
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitor
+  namespace: kubemon
+spec:
+  selector:
+    app: monitor
+  clusterIP: None
+  externalName: monitor
+  ports:
+  - name: rest
+    port: 9822
+    targetPort: 9822

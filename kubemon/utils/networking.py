@@ -1,12 +1,14 @@
 from kubemon.settings import Volatile
 
 from pathlib import Path
+from typing import List
 
 import socket
 import pickle
 import fcntl
 import struct
 import psutil
+import os
 
 Volatile.set_procfs(psutil.__name__)
 
@@ -99,3 +101,12 @@ def gethostname() -> str:
         with open('/etc/host_hostname', mode='r') as fp:
             return fp.read().strip()
     return socket.gethostname()
+
+def _check_service(service_name: str) -> bool:
+    if service_name in os.environ:
+        return True
+    return False
+
+def nslookup(addr: str, port: int) -> List[str]:
+    sockets = socket.getaddrinfo(addr, port)
+    return [s[-1][0] for s in sockets if s[1] == socket.SOCK_STREAM]

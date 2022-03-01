@@ -12,6 +12,7 @@ STOPSIGNAL SIGINT
 COPY setup.py .
 COPY entrypoint.sh .
 COPY kubemon/ kubemon/
+COPY README.md .
 
 RUN mkdir -p kubemon-data/logs kubemon-data/data && chown -R kubemon:kubemon ${HOME} /usr/local/bin/python 
 RUN chmod +x entrypoint.sh

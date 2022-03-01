@@ -13,11 +13,13 @@ collector:
 	-p 9822:9822/tcp \
 	-p 9880:9880/udp \
 	-v $(HOST_DIR):/home/kubemon/kubemon-data \
+	-e MONITOR=monitor \
 	--rm \
 	--name collector \
-	-d \
+	-it \
 	vpemfh7/kubemon:latest \
-	-t collector
+	-t collector \
+	-H $(host)
 
 monitor:
 	docker run \
@@ -30,7 +32,7 @@ monitor:
 	--privileged \
 	--rm \
 	--name monitor \
-	-d \
+	-it \
 	vpemfh7/kubemon:latest \
 	-H $(host) \
 	-t daemon \

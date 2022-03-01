@@ -84,3 +84,7 @@ def save_csv(_dict: dict, name: str, dir_name="", output_dir=DATA_PATH) -> None:
             writer.writeheader()
 
         writer.writerow(_dict)
+
+
+def diff_list(l1: List[Any], l2: List[Any]) -> List[Any]:
+    return list(set(l1) ^ set(l2))

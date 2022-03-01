@@ -1,3 +1,4 @@
+from kubemon.monitors.base import BaseMonitor
 from kubemon.settings import DISK_PARTITION
 from kubemon.entities import (
     CPU, Memory, 
@@ -5,13 +6,14 @@ from kubemon.entities import (
 )
 from kubemon.utils.networking import get_host_ip, gethostname
 
-class OSMonitor:
+class OSMonitor(BaseMonitor):
+    _type = 'os'
+
     def get_stats(self):
-        _type = 'os'
-        disk = Disk(DISK_PARTITION, _type)
-        cpu = CPU(_type)
-        net = Network(_type)
-        mem = Memory(_type)
+        disk = Disk(DISK_PARTITION, self._type)
+        cpu = CPU(self._type)
+        net = Network(self._type)
+        mem = Memory(self._type)
 
         return {**cpu(),**mem(),**disk(DISK_PARTITION),**net()}
 

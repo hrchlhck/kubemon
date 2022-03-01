@@ -16,3 +16,4 @@ build/
 
 # Ignoring available scripts at https://gist.github.com/hrchlhck
 setup-scripts/
+.pytest_cache/

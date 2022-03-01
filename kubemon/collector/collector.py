@@ -1,20 +1,17 @@
 from kubemon.collector.commands import COMMAND_CLASSES, HelpCommand
+from kubemon.collector.monitor_handler import MonitorHandler
 from kubemon.log import create_logger
 
 from kubemon.settings import ( 
-    DATA_PATH, 
-    START_MESSAGE,
     CLI_PORT,
-    COLLECT_INTERVAL,
-    COLLECT_TASK_PORT,
     COLLECTOR_HEALTH_CHECK_PORT,
-    COLLECTOR_INSTANCES_CHECK_PORT,
-    MONITOR_PORT
+    MONITOR_PORT,
+    SERVICE_NAME
 )
 from kubemon.utils.data import (
-    in_both, save_csv, subtract_dicts
+    diff_list, in_both, save_csv, subtract_dicts
 )
-from kubemon.utils.networking import receive, send_to
+from kubemon.utils.networking import nslookup, receive, send_to, _check_service
 
 from typing import Dict
 from time import sleep
@@ -53,6 +50,8 @@ class Collector(threading.Thread):
         self.event = threading.Event()
         self.stop_request = False
         self.logger = LOGGER
+        self.metric_paths = list()
+        self._monitor_threads = list()
 
     @property
     def address(self) -> str:
@@ -168,19 +167,29 @@ class Collector(threading.Thread):
         """ Start the collector """
         start_thread(self.__start_cli)
         start_thread(self.__is_alive)
-        start_thread(self.__register_daemons)
+        start_thread(self.__probe_for_daemons)
 
-        self.listen_collect_task()
+        self._handle_monitors()
 
-    def __register_daemons(self) -> None:
-        with self.setsock(self.address, COLLECTOR_INSTANCES_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
-            sockfd.listen()
-            self.logger.debug(f'Started thread for __register_daemons')
+    def __probe_for_daemons(self) -> None:
+        if not _check_service(SERVICE_NAME):
+            raise EnvironmentError(f'Missing \'{SERVICE_NAME}\' env. var')
 
-            while True:
-                conn, addr = sockfd.accept()
-                self.logger.debug(f'Accepted connection for {":".join(map(str, addr))}')
-                start_thread(self.__listen_daemon, args=(conn,))
+        old_services = nslookup(SERVICE_NAME, MONITOR_PORT)
+        while True:
+            sleep(3)
+            new_services = nslookup(SERVICE_NAME, MONITOR_PORT)
+
+            if old_services != new_services:
+                diff_services = diff_list(old_services, new_services)
+
+                for service in diff_services:
+                    resp = requests.get(f'http://{service}:{MONITOR_PORT}/').json()
+
+                    with self.mutex:
+                        self.__daemons[resp['hostname']] = service
+
+            old_services = new_services
 
     def __is_alive(self) -> None:
         with self.setsock(self.address, COLLECTOR_HEALTH_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
@@ -193,65 +202,13 @@ class Collector(threading.Thread):
 
                 conn.close()
 
-    def __listen_daemon(self, sockfd: socket.socket) -> None:
-        self.logger.debug(f'Started thread for {":".join(map(str, sockfd.getsockname()))}')
-        (name, addr), _ = receive(sockfd)
-
-        self.logger.debug(f'Received name: {name}, and address {addr}')
-
-        with self.mutex:
-            self.__daemons[name] = addr
-
-        self.collect_task(name, addr)
-
-    def listen_collect_task(self) -> None:
-        with self.setsock(self.address, COLLECT_TASK_PORT, socket.SOCK_STREAM) as sockfd:
-            sockfd.listen()
-
-            self.logger.info('Started listen_collect_task')
-            while True:
-                conn, addr = sockfd.accept()
-                self.logger.info(f'Accepted connection at listen_collect_task for {addr}')
-
-                msg, _ = receive(conn)
-                self.logger.info(f'Received name {msg}')
-
-                self.collector_sockets[msg] = conn
-                
-    def collect_task(self, name: str, addr: str) -> None:
-        self.logger.info(f"Calling collect_task for {name}@{addr}")
-
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
-            sockfd.connect((self.address, COLLECT_TASK_PORT))
-
-            send_to(sockfd, name)
-
-            while True:
-
-                msg, _ = receive(sockfd)
-                self.logger.info('Received message: %s' % msg)
-
-                if msg == START_MESSAGE:
-                    while not self.stop_request:
-                        if self.stop_request:
-                            self.logger.info(f'Stopped for {name}@{addr}')
-                            break
-
-                        old_data = requests.get(f'http://{addr}:{MONITOR_PORT}').json()
-
-                        sleep(COLLECT_INTERVAL)
-                        
-                        new_data = requests.get(f'http://{addr}:{MONITOR_PORT}').json()
-
-                        for k in in_both(old_data, new_data):
-                            ret = subtract_dicts(old_data[k], new_data[k])
-                            ret['timestamp'] = datetime.now()
-
-                            if self.dir_name:
-                                dir_name = join_path(self.dir_name, k.split("_")[0])
-
-                            save_csv(ret, k, dir_name=dir_name)
-                            self.logger.info(f"Saving data to {str(DATA_PATH)}/{self.dir_name}/{k}")
-
-                            if self.stop_request:
-                                self.event.set()
+    def _handle_monitors(self) -> None:
+        while True:
+            with self.mutex:
+                for hostname in self.__daemons:
+                    addr = self.__daemons[hostname]
+                    if hostname not in self._monitor_threads:
+                        self.logger.info(f'Creating MonitorHandler for {hostname}@{addr}')
+                        MonitorHandler(addr, hostname, self).start()
+                        self._monitor_threads.append(hostname)
+            sleep(3)

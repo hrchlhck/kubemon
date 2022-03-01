@@ -20,18 +20,15 @@ A tool for distributed container monitoring over Kubernetes.
 ## Environment requirements
 - Ubuntu 18.04
 - Kubernetes v1.19
-- Docker v.19.03.13
+- Docker v19.03.13
 - Python 3.8
-- make
 
 ## Application requirements
 - [psutil](https://github.com/giampaolo/psutil)
 - [requests](https://github.com/psf/requests)
-- [addict](https://github.com/mewwts/addict)
 - [docker-py](https://github.com/docker/docker-py)
-- [sty](https://github.com/feluxe/sty)
 - [virtualenv](https://github.com/pypa/virtualenv)
-
+- [flask](https://github.com/pallets/flask)
 ## Illustrations
 Basic diagram
 ![Kubemon diagram](./assets/diagram-en.svg)

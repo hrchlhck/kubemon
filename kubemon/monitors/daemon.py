@@ -1,17 +1,16 @@
 from functools import wraps
-from typing import Any, Callable, List
+from typing import Any, Callable, Dict, List
+
 from kubemon.dataclasses import Pod
 from kubemon.log import create_logger
 from kubemon.pod import list_pods
-
 from kubemon.utils.process import get_children_pids, pid_exists
 from kubemon.utils.containers import get_containers, get_container_pid
-from kubemon.utils.networking import get_host_ip, gethostname, is_alive, send_to
+from kubemon.utils.networking import get_host_ip
+from kubemon.utils.monitors import list_monitors
 
 from kubemon.settings import (
     MONITOR_PORT,
-    COLLECTOR_HEALTH_CHECK_PORT,
-    COLLECTOR_INSTANCES_CHECK_PORT,
     Volatile
 ) 
 from . import (
@@ -19,8 +18,6 @@ from . import (
     DockerMonitor, 
     ProcessMonitor
 )
-
-from time import sleep as time_sleep
 
 import psutil
 import docker
@@ -63,44 +60,44 @@ class Kubemond(threading.Thread):
     def mutex(self) -> threading.Lock:
         return self.__mutex
 
-    def _connect_collector(self):
-        self.logger.info('Started _connect_collector')
-        state = is_alive(self.address, COLLECTOR_HEALTH_CHECK_PORT)
+    @staticmethod
+    def _jsonify(instances: list) -> Dict[str, dict]:
+        instances = {str(i): i.get_stats() for i in instances}
 
-        while not state:
-            self.logger.debug('Waiting for collector to be alive')
-            time_sleep(2)
-            state = is_alive(self.address, COLLECTOR_HEALTH_CHECK_PORT)
-        else:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
-                sockfd.connect((self.address, COLLECTOR_INSTANCES_CHECK_PORT))
-                self.logger.info('Connected to collector')
-
-                name = gethostname()
-                address = str(get_host_ip())
-                msg = (name, address)
-
-                send_to(sockfd, msg)
-                self.logger.debug(f'Sent {msg} to {self.address}:{COLLECTOR_INSTANCES_CHECK_PORT}')
+        return flask.jsonify(instances)
 
     def run(self) -> None:
-        # Send to collector the daemon name and IP
-        self._connect_collector()
-
         APP.run(host=get_host_ip(), port=self.port)
 
     @staticmethod
     @APP.route('/')
     def _init_monitors() -> None:
-        LOGGER.info((Volatile.PROCFS_PATH, Volatile.NUM_DAEMONS))
+        _MODULES = [DockerMonitor, ProcessMonitor, OSMonitor]
+        data = {
+            'hostname': str(OSMonitor()),
+            'metric_paths': ['/' + i for i in list_monitors(_MODULES)],
+        }
+        return flask.jsonify(data)
+    
+    @staticmethod
+    @APP.route('/docker')
+    def _docker_instances() -> dict:
         client = docker.from_env()
-        instances = docker_instances(client) \
-                    + process_instances(client) \
-                    + [OSMonitor()]
-        
-        instances = {str(i): i.get_stats() for i in instances}
+        instances = docker_instances(client)
+        return Kubemond._jsonify(instances)
+    
+    @staticmethod
+    @APP.route('/process')
+    def _process_instances() -> dict:
+        client = docker.from_env()
+        instances = process_instances(client)
+        return Kubemond._jsonify(instances)
+    
+    @staticmethod
+    @APP.route('/os')
+    def _os_instance() -> dict:
+        return Kubemond._jsonify([OSMonitor()])
 
-        return flask.jsonify(instances)
 
 def client_error(func: Callable) -> Callable:
     @wraps(func)
