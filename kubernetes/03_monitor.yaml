@@ -17,7 +17,7 @@ spec:
       containers:
         - name: kubemon-monitor
           image: vpemfh7/kubemon:latest
-          args: ["-t", "daemon", "-H", "collector", "-p", "9822"]
+          args: ["-t", "daemon", "-H", "collector"]
           securityContext:
             privileged: true
           volumeMounts:

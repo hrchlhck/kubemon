@@ -10,8 +10,8 @@ spec:
   externalName: collector
   ports:
   - name: handler
-    port: 80
-    targetPort: 80
+    port: 9822
+    targetPort: 9822
   - name: cmd-iface
     port: 9880
     targetPort: 9880

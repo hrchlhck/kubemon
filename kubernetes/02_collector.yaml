@@ -8,10 +8,10 @@ metadata:
 spec:
   nodeName: projsec01
   containers:
-  - name: collector
+  - name: kubemon-collector
     image: vpemfh7/kubemon:latest
     imagePullPolicy: IfNotPresent
-    args: ["-t", "collector", "-H", "$(POD_IP)", "-n", "5", "-p", "9822"]
+    args: ["-t", "collector", "-H", "$(POD_IP)", "-n", "4", "-p", "9822"]
     env:
     - name: POD_IP
       valueFrom:
@@ -21,7 +21,7 @@ spec:
       value: monitor
     ports:
     - name: handler
-      containerPort: 80
+      containerPort: 9822
     - name: cmd-iface
       containerPort: 9880
     - name: healthcheck
