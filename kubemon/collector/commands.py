@@ -1,5 +1,5 @@
 from kubemon.utils.networking import send_to, is_alive
-from kubemon.settings import DATA_PATH, MONITOR_PORT, START_MESSAGE
+from kubemon.settings import DATA_PATH, MONITOR_PORT, START_MESSAGE, Volatile
 
 from typing import Dict
 from datetime import datetime
@@ -31,9 +31,8 @@ class StartCommand(Command):
         if not collector.dir_name:
             return "Argument 'dir_name' is missing.\n"
 
-        for instance in collector.collector_sockets:
-            sock = collector.collector_sockets[instance]
-            send_to(sock, START_MESSAGE)
+        for sockfd in collector._monitor_sockets:
+            send_to(sockfd, START_MESSAGE)
 
         collector.running_since = datetime.now()
 
@@ -68,7 +67,6 @@ class IsReadyCommand(Command):
         from kubemon.settings import Volatile
         
         collector = self._collector
-        collector.logger.info(collector.collect_status)
 
         return not collector.stop_request and len(collector) == Volatile.NUM_DAEMONS
 
@@ -98,7 +96,9 @@ class StopCommand(Command):
         with collector.mutex:
             collector.stop_request = True
         
-        collector.event.wait()
+        # Release all the monitors from the barrier
+        for _ in range(Volatile.NUM_DAEMONS):
+            collector.barrier.acquire()
 
         return 'Stopped collector\n'
 

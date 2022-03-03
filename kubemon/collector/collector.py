@@ -1,24 +1,21 @@
 from kubemon.collector.commands import COMMAND_CLASSES, HelpCommand
 from kubemon.collector.monitor_handler import MonitorHandler
 from kubemon.log import create_logger
-
+from kubemon.utils.networking import nslookup, receive, send_to, _check_service
 from kubemon.settings import ( 
     CLI_PORT,
     COLLECTOR_HEALTH_CHECK_PORT,
     MONITOR_PORT,
-    SERVICE_NAME
+    SERVICE_NAME,
+    Volatile
 )
-from kubemon.utils.data import (
-    diff_list, in_both, save_csv, subtract_dicts
-)
-from kubemon.utils.networking import nslookup, receive, send_to, _check_service
 
-from typing import Dict
+from typing import Dict, List
 from time import sleep
-from os.path import join as join_path
 from datetime import datetime
 
 import socket
+import os
 import threading
 import requests
 
@@ -42,16 +39,15 @@ class Collector(threading.Thread):
         self.__cli_port = cli_port
         self.dir_name = None
         self.mutex = threading.Lock()
-        self.name = self.__class__.__name__
         self.__running_since = None
         self.__daemons = dict()
-        self.collector_sockets = dict()
-        self.collect_status = dict()
-        self.event = threading.Event()
+        self.barrier = threading.Semaphore(0)
         self.stop_request = False
         self.logger = LOGGER
-        self.metric_paths = list()
-        self._monitor_threads = list()
+        self.__metric_paths: List[str] = list()
+        self._monitor_threads: List[str] = list()
+        self._monitor_sockets: List[socket.socket] = list()
+        self._alive = False
 
     @property
     def address(self) -> str:
@@ -78,7 +74,27 @@ class Collector(threading.Thread):
         self.__running_since = val
  
     def __len__(self):
-        return len(self.collector_sockets)
+        return len(self._monitor_sockets)
+
+    @property
+    def metric_paths(self) -> List[str]:
+        return self.__metric_paths
+
+    def set_metric_paths(self, url: str) -> None:
+        if not url.startswith('http://'):
+            url = f'http://{url}'
+
+        if not self.__metric_paths:
+            resp = requests.get(url).json()
+
+            with self.mutex:
+                self.__metric_paths = resp['metric_paths']
+                self.logger.info(f'Set metric paths to {self.metric_paths}')
+
+    def _get_paths(self, url: str) -> str:
+        self.set_metric_paths(url)
+
+        return [url + p for p in self.metric_paths]
 
     def __listen_cli(self, cli: socket.socket) -> None:
         """ 
@@ -169,27 +185,45 @@ class Collector(threading.Thread):
         start_thread(self.__is_alive)
         start_thread(self.__probe_for_daemons)
 
-        self._handle_monitors()
+        self._listen_monitor_handler()
 
     def __probe_for_daemons(self) -> None:
+        self._wait_alive()
+
         if not _check_service(SERVICE_NAME):
             raise EnvironmentError(f'Missing \'{SERVICE_NAME}\' env. var')
 
-        old_services = nslookup(SERVICE_NAME, MONITOR_PORT)
+        svc_name = os.environ[SERVICE_NAME]
+
         while True:
+
             sleep(3)
-            new_services = nslookup(SERVICE_NAME, MONITOR_PORT)
+            services = nslookup(svc_name, MONITOR_PORT)
 
-            if old_services != new_services:
-                diff_services = diff_list(old_services, new_services)
+            for service in services:
+                url = f'http://{service}:{MONITOR_PORT}'
 
-                for service in diff_services:
-                    resp = requests.get(f'http://{service}:{MONITOR_PORT}/').json()
+                resp = requests.get(url)
+
+                if resp.status_code != 200:
+                    self.logger.info(f'Monitor {service} could not be registered.')
+                    self.logger.info(f'Status code: {resp.status_code}')
+                    continue
+
+                resp = resp.json()
+                host_str = f'{resp["hostname"]}@{service}:{MONITOR_PORT}'
+                
+                status = self._add_monitor(f'{service}:{MONITOR_PORT}', resp['hostname'])
+
+                if status:
+                    self.logger.info(f'Registered monitor {host_str}')
+                    
+                    self.set_metric_paths(url)
 
                     with self.mutex:
                         self.__daemons[resp['hostname']] = service
 
-            old_services = new_services
+
 
     def __is_alive(self) -> None:
         with self.setsock(self.address, COLLECTOR_HEALTH_CHECK_PORT, socket.SOCK_STREAM) as sockfd:
@@ -198,17 +232,36 @@ class Collector(threading.Thread):
             while True:
                 conn, _ = sockfd.accept()
 
-                sleep(1)
-
                 conn.close()
 
-    def _handle_monitors(self) -> None:
-        while True:
+    def _wait_alive(self):
+        while not self._alive:
+            sleep(2)
+        self.logger.info('I\'m alive')
+
+    def _add_monitor(self, address: str, hostname: str) -> bool:
+        if hostname not in self._monitor_threads:
+            mh = MonitorHandler(address, hostname, self)
+
+            mh.start()
+
             with self.mutex:
-                for hostname in self.__daemons:
-                    addr = self.__daemons[hostname]
-                    if hostname not in self._monitor_threads:
-                        self.logger.info(f'Creating MonitorHandler for {hostname}@{addr}')
-                        MonitorHandler(addr, hostname, self).start()
-                        self._monitor_threads.append(hostname)
-            sleep(3)
+                self._monitor_threads.append(hostname)
+            
+            return True
+        return False
+    
+    def _listen_monitor_handler(self) -> None:
+        with self.setsock(self.address, self.port, socket.SOCK_STREAM) as sockfd:
+            sockfd.listen()
+
+            self._alive = True
+
+            while True:
+                conn, _ = sockfd.accept()
+                
+                hostname, _ = receive(conn)
+
+                self.logger.info(f'Connection stablished between collector and {hostname}')
+
+                self._monitor_sockets.append(conn)
