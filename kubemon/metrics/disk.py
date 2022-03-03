@@ -36,10 +36,6 @@ class Partition:
     def name(self):
         return self.__partition_name
 
-    @property
-    def infos(self):
-        return self.__info
-
     def __getitem__(self, info):
         return self.__info[info]
     
