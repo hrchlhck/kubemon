@@ -3,14 +3,26 @@ from kubemon.settings import DATA_PATH, MONITOR_PORT, START_MESSAGE, Volatile
 
 from typing import Dict
 from datetime import datetime
+from functools import lru_cache, wraps
 
+import time
 import requests
 import abc
+
+def newline_decorator(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        ret = func(*args, **kwargs)
+        if not isinstance(ret, str):
+            return str(ret) + '\n'
+        return ret
+    return wrapper
+
 
 class Command(abc.ABC):
     def __init__(self, collector,):
         self._collector = collector
-
+    
     @abc.abstractmethod
     def execute(self) -> str:
         pass
@@ -22,6 +34,7 @@ class StartCommand(Command):
         - Directory name to be saving the data collected. Ex.: start test000
     """
 
+    @newline_decorator
     def execute(self) -> str:
         collector = self._collector
 
@@ -34,27 +47,59 @@ class StartCommand(Command):
         for sockfd in collector._monitor_sockets:
             send_to(sockfd, START_MESSAGE)
 
+        with collector.mutex:
+            collector.is_running = True
+
         collector.running_since = datetime.now()
 
-        return f"Starting {len(collector)} daemons and saving data at {collector.address}:{str(DATA_PATH)}/{collector.dir_name}\n"
+        return f"Starting {len(collector)} daemons and saving data at {collector.address}:{str(DATA_PATH)}/{collector.dir_name}"
 
 
 class InstancesCommand(Command):
     """ Lists all the connected monitor instances.
     """
 
+    def _instances_per_daemon(self, module: str, url: str) -> str:
+        req = requests.get(url + module)
+
+        if req.status_code != 200:
+            return ''
+        return req.json()
+
+    @lru_cache
+    @newline_decorator
     def execute(self) -> str:
         collector = self._collector
         message = ""
         port = MONITOR_PORT
         
         total = 0
-        for hostname, addr in collector.daemons.items():
-            req = requests.get(f'http://{addr}:{port}').json()
-            total += len(req)
-            message += f'Instances in {hostname}@{addr}: {len(req)}\n'
+        start_time = time.time()
+        
+        with collector.mutex:
+            for hostname, addr in collector.daemons.items():
+                url = f'http://{addr}:{port}'
+                req = requests.get(url)
+
+                if req.status_code != 200:
+                    continue
+
+                req = req.json()
+
+                instances_per_module = {module: len(self._instances_per_daemon(module, url)) for module in req['metric_paths']}
+                total_per_daemon = sum(i for i in instances_per_module.values())
+                total += total_per_daemon
+                message += f'Instances in {hostname}@{addr}: {total_per_daemon}\n'
+
+                # Listing number of instances per module, per daemon
+                for module, n_inst in instances_per_module.items():
+                    name = module.upper().replace('/', '')
+                    message += f'\t - {name}: {n_inst}\n'
 
         message += f'Total instances: {total}'  
+        end_time = time.time()
+
+        message += f'\nTotal processing time: {end_time - start_time:.3f}s'
 
         return message
 
@@ -63,6 +108,7 @@ class IsReadyCommand(Command):
     be connected to the collector.
     """
 
+    @newline_decorator
     def execute(self) -> str:
         from kubemon.settings import Volatile
         
@@ -74,6 +120,7 @@ class ConnectedDaemonsCommand(Command):
     """ Lists all the daemons (hosts) connected.
     """
     
+    @newline_decorator
     def execute(self) -> str:
         collector = self._collector
 
@@ -90,9 +137,13 @@ class StopCommand(Command):
     """ Stop all monitors if they're running.
     """
     
+    @newline_decorator
     def execute(self) -> str:
         collector = self._collector
         
+        if not collector.is_running:
+            return 'Collector isn\'t running to be stopped.'
+
         with collector.mutex:
             collector.stop_request = True
         
@@ -100,14 +151,20 @@ class StopCommand(Command):
         for _ in range(Volatile.NUM_DAEMONS):
             collector.barrier.acquire()
 
-        return 'Stopped collector\n'
+        # Resetting the collector status
+        with collector.mutex:
+            collector.stop_request = False
+            collector.is_running = False
+
+        return 'Stopped collector'
 
 class NotExistCommand(Command):
     """ Indicates if a command does not exist. 
     """
 
+    @newline_decorator
     def execute(self) -> str:
-        return "Command does not exist\n"
+        return "Command does not exist"
 
 class HelpCommand(Command):
     """ Lists all the available commands.
@@ -115,6 +172,7 @@ class HelpCommand(Command):
     def __init__(self, command_dict: Dict[str, Command]):
         self._cmd_dict = command_dict
     
+    @newline_decorator
     def execute(self) -> str:
         msg = ""
 
@@ -136,18 +194,6 @@ class IsAliveCommand(Command):
     def execute(self) -> bool:
         return is_alive(self._addr, self._port)
 
-class RestartCommand(Command):
-    """ Restars the monitor instances
-    """
-
-    def execute(self) -> str:
-        collector = self._collector
-        
-        with collector.mutex:
-            collector.stop_request = False
-
-        return 'Restarted collector\n'
-
 COMMAND_CLASSES = {
     'start': StartCommand,
     'instances': InstancesCommand,
@@ -156,6 +202,5 @@ COMMAND_CLASSES = {
     'not exist': NotExistCommand,
     'help': HelpCommand,
     'alive': IsAliveCommand,
-    'restart': RestartCommand,
     '_is_ready': IsReadyCommand,
 }

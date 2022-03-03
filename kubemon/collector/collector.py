@@ -43,6 +43,7 @@ class Collector(threading.Thread):
         self.__daemons = dict()
         self.barrier = threading.Semaphore(0)
         self.stop_request = False
+        self.is_running = False
         self.logger = LOGGER
         self.__metric_paths: List[str] = list()
         self._monitor_threads: List[str] = list()
