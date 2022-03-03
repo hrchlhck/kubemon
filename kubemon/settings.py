@@ -8,14 +8,13 @@ import sys
 LOGGING_LEVEL = logging.INFO
 
 ## Monitors configuration
-MONITOR_PORT = 9822
+MONITOR_PORT = 80
 COLLECT_INTERVAL = 5
 NUM_DAEMONS = 1
 SERVICE_NAME = 'MONITOR_DOMAIN'
 
 ## CLI configuration
 CLI_PORT = 9880
-DAEMON_PORT = 9881
 COLLECTOR_HEALTH_CHECK_PORT = 9882
 
 ## Disk configuration

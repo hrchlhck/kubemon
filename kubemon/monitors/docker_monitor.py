@@ -138,10 +138,6 @@ class DockerMonitor(BaseMonitor):
     @property
     def container(self) -> Container:
         return self.__container
-    
-    @property
-    def pod(self) -> Pod:
-        return self.__pod
 
     def __str__(self) -> str:
         ip = get_host_ip().replace('.', '_')
@@ -220,26 +216,3 @@ class DockerMonitor(BaseMonitor):
 
         return {**cpu, **memory, **network, **disk}
     
-    def _get_stats(self, *args, **kwargs) -> dict:
-        stats = self.container.stats(stream=False)
-
-        ret_old = {
-            **StatParser.cpu(stats['cpu_stats']),
-            **StatParser.blkio(stats['blkio_stats']),
-            **StatParser.memory(stats['memory_stats']),
-            **StatParser.network(stats['networks']),
-        }
-
-        # Subtracting 2 because the 'container.stats' response takes 1 second to process
-        sleep(self.interval - 2)
-
-        stats = self.container.stats(stream=False)
-
-        ret = {
-            **StatParser.cpu(stats['cpu_stats']),
-            **StatParser.blkio(stats['blkio_stats']),
-            **StatParser.memory(stats['memory_stats']),
-            **StatParser.network(stats['networks']),
-        }
-
-        return subtract_dicts(ret_old, ret)

@@ -2,7 +2,6 @@ from kubemon.settings import DATA_PATH
 
 from functools import reduce
 from pathlib import Path
-from os.path import join, isfile
 from typing import Any, List
 
 from csv import DictWriter
@@ -45,8 +44,14 @@ def filter_dict(_dict: dict, *keys: List[Any]) -> dict:
 
 def in_both(d1: dict, d2: dict) -> list:
     """ Return the intersecting keys between two dictionaries """
-    keys = [*d1.keys(), *d2.keys()]
-    return set([key for key in keys if key in d1 and key in d2])
+    if not isinstance(d1, dict) or not isinstance(d2, dict):
+        d = d1 if not isinstance(d1, dict) else d2
+        raise TypeError(f'Expected dictionary instead of {type(d).__name__}')
+    
+    if not d1 and not d2:
+        return list()
+
+    return list(set(d1.keys()).intersection(d2.keys()))
 
 def save_csv(_dict: dict, name: str, dir_name="", output_dir=DATA_PATH) -> None:
     """ 
@@ -55,36 +60,37 @@ def save_csv(_dict: dict, name: str, dir_name="", output_dir=DATA_PATH) -> None:
     Args:
         _dict (dict): The dictionary that will be written or appended in the file
         name (str): The name of the file
-        dir_name (str): Subdirectory inside .config.DATA_PATH that the file will be saved
+        dir_name (str): Subdirectory inside .settings.DATA_PATH that the file will be saved
 
     Raises:
-        ValueError 
+        TypeError 
             if `dir_name` type isn't string 
     """
-    filename = "%s.csv" % name
+    filename = f"{name}.csv"
+
+    if not isinstance(_dict, dict):
+        raise TypeError(f'Expected a dictionary instead of {type(_dict).__name__}')
+    
+    if not isinstance(name, str):
+        raise TypeError(f'Expected a string instead of {type(_dict).__name__}')
 
     if dir_name and not isinstance(dir_name, str):
-        raise ValueError("Expected str instead of %s" % type(dir_name))
+        raise TypeError(f"Expected str instead of {type(dir_name).__name__}")
     elif dir_name and isinstance(dir_name, str):
-        output_dir = output_dir.joinpath(dir_name)
+        output_dir = output_dir / dir_name
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    output_dir = join(output_dir, filename)
+    output_dir = output_dir / filename
 
-    mode = "a"
+    write_header = False
+    if not output_dir.exists():
+        write_header = True
 
-    if not isfile(output_dir):
-        mode = "w"
-
-    with open(output_dir, mode=mode, newline="") as f:
+    with open(output_dir, mode='a+', newline="") as f:
         writer = DictWriter(f, _dict.keys())
 
-        if mode == "w":
+        if write_header:
             writer.writeheader()
 
         writer.writerow(_dict)
-
-
-def diff_list(l1: List[Any], l2: List[Any]) -> List[Any]:
-    return list(set(l1) ^ set(l2))
