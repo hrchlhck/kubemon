@@ -38,7 +38,7 @@ spec:
             readOnly: true
           ports:
             - name: http
-              containerPort: 9822
+              containerPort: 80
       volumes:
       - name: sys
         hostPath:

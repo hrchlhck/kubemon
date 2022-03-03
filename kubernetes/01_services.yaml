@@ -9,6 +9,9 @@ spec:
   clusterIP: None
   externalName: collector
   ports:
+  - name: handler
+    port: 80
+    targetPort: 80
   - name: cmd-iface
     port: 9880
     targetPort: 9880
@@ -31,5 +34,5 @@ spec:
   externalName: monitor
   ports:
   - name: rest
-    port: 9822
-    targetPort: 9822
+    port: 80
+    targetPort: 80
