@@ -32,4 +32,6 @@ SYSTEMS = {
 }
 
 def get_module(module: str, address: str, port: int) -> object:
-    return SYSTEMS.get(module)(address=address, port=port)
+    if module != 'daemon':
+        return SYSTEMS.get(module)(address=address, port=port)
+    return SYSTEMS.get(module)(port=port)

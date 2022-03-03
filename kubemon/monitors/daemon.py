@@ -22,7 +22,6 @@ from . import (
 import psutil
 import docker
 import threading
-import socket
 import flask
 
 __all__ = ['Kubemond']
@@ -33,33 +32,17 @@ APP = flask.Flask(__name__)
 class Kubemond(threading.Thread):
     """ Kubemon Daemon Class. """
 
-    def __init__(self, address: str, port=MONITOR_PORT):
+    def __init__(self, port=MONITOR_PORT):
         Volatile.set_procfs(psutil.__name__)
-
-        self.__address = address
         self.__port = port
-        self.__mutex = threading.Lock()
-        self.__directory = None
         self.logger = LOGGER
 
         threading.Thread.__init__(self)
     
     @property
-    def address(self) -> str:
-        return self.__address
-
-    @property
     def port(self) -> int:
         return self.__port
-   
-    @property
-    def directory(self) -> str:
-        return self.__directory
     
-    @property
-    def mutex(self) -> threading.Lock:
-        return self.__mutex
-
     @staticmethod
     def _jsonify(instances: list) -> Dict[str, dict]:
         instances = {str(i): i.get_stats() for i in instances}
@@ -75,26 +58,26 @@ class Kubemond(threading.Thread):
         _MODULES = [DockerMonitor, ProcessMonitor, OSMonitor]
         data = {
             'hostname': str(OSMonitor()),
-            'metric_paths': ['/' + i for i in list_monitors(_MODULES)],
+            'metric_paths': [flask.url_for(i) for i in list_monitors(_MODULES)],
         }
         return flask.jsonify(data)
     
     @staticmethod
-    @APP.route('/docker')
+    @APP.route('/docker', endpoint='docker')
     def _docker_instances() -> dict:
         client = docker.from_env()
         instances = docker_instances(client)
         return Kubemond._jsonify(instances)
     
     @staticmethod
-    @APP.route('/process')
+    @APP.route('/process', endpoint='process')
     def _process_instances() -> dict:
         client = docker.from_env()
         instances = process_instances(client)
         return Kubemond._jsonify(instances)
     
     @staticmethod
-    @APP.route('/os')
+    @APP.route('/os', endpoint='os')
     def _os_instance() -> dict:
         return Kubemond._jsonify([OSMonitor()])
 
@@ -119,7 +102,7 @@ def docker_instances(client: docker.client.DockerClient) -> List[DockerMonitor]:
 
     pods = list_pods(client=client, from_k8s=False)
 
-    return list(map(to_monitor, pods))    
+    return list(map(to_monitor, pods))
 
 @client_error
 def process_instances(client: docker.client.DockerClient) -> List[ProcessMonitor]:

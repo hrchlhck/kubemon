@@ -108,5 +108,8 @@ def _check_service(service_name: str) -> bool:
     return False
 
 def nslookup(addr: str, port: int) -> List[str]:
-    sockets = socket.getaddrinfo(addr, port)
-    return [s[-1][0] for s in sockets if s[1] == socket.SOCK_STREAM]
+    try:
+        sockets = socket.getaddrinfo(addr, port)
+        return [s[-1][0] for s in sockets if s[1] == socket.SOCK_STREAM]
+    except socket.gaierror:
+        return []
