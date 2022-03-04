@@ -22,7 +22,7 @@ DISK_PARTITION = 'sda'
 
 # Directories
 PROJECT_BASE = Path(__file__).absolute().parent.parent
-DATA_DIR = PROJECT_BASE / 'kubemon-output'
+DATA_DIR = PROJECT_BASE / 'output'
 
 ## Logger path
 LOG_PATH = DATA_DIR / 'logs'

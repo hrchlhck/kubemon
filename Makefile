@@ -12,7 +12,7 @@ collector:
 	docker run \
 	-p 9822:9822/tcp \
 	-p 9880:9880/udp \
-	-v $(HOST_DIR):/home/kubemon/kubemon-data \
+	-v $(HOST_DIR):/home/kubemon/output \
 	-e MONITOR=monitor \
 	--rm \
 	--name collector \
