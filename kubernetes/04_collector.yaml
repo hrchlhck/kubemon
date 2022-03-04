@@ -7,11 +7,17 @@ metadata:
     app: collector
 spec:
   nodeName: projsec01
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: kubemon-volume-claim
   containers:
   - name: kubemon-collector
     image: vpemfh7/kubemon:latest
     imagePullPolicy: IfNotPresent
     args: ["-t", "collector", "-H", "$(POD_IP)", "-p", "9822"]
+    securityContext:
+      privileged: true
     env:
     - name: POD_IP
       valueFrom:
@@ -29,3 +35,6 @@ spec:
       containerPort: 9882
     - name: instances-check
       containerPort: 9883
+    volumeMounts:
+      - name: data
+        mountPath: "/home/kubemon/output"
