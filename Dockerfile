@@ -1,6 +1,7 @@
 FROM python:3.8-slim
 
 ENV HOME /home/kubemon
+ENV WITHIN_DOCKER yes
 
 RUN apt update -y
 RUN groupadd -r kubemon && useradd -ms /bin/bash -rg kubemon kubemon

@@ -6,6 +6,8 @@ import logging
 import sys
 import os
 
+import psutil
+
 def _check_environ(var: str) -> bool:
     return var in os.environ
 
@@ -15,19 +17,39 @@ VARS = (
     'SERVICE_NAME',
     'COLLECT_INTERVAL',
     'OUTPUT_DIR',
+    'NAMESPACES',
+    'FROM_K8S',
 )
 
-for var in VARS:
-    if not _check_environ(var):
-        raise EnvironmentError(f'Missing {var} env. var.')
-
 LOGGING_LEVEL = logging.INFO
+PROJECT_BASE = Path(__file__).absolute().parent.parent
 
-## Monitors configuration
-MONITOR_PORT = int(os.environ['MONITOR_PORT'])
-COLLECT_INTERVAL = int(os.environ['COLLECT_INTERVAL'])
-NUM_DAEMONS = int(os.environ['NUM_DAEMONS'])
-SERVICE_NAME = os.environ['SERVICE_NAME']
+if 'WITHIN_DOCKER' in os.environ:
+
+    p = psutil.Process(os.getpid())
+    p.nice(-20)
+
+    for var in VARS:
+        if not _check_environ(var):
+            raise EnvironmentError(f'Missing {var} env. var.')
+
+
+    ## Monitors configuration
+    MONITOR_PORT = int(os.environ['MONITOR_PORT'])
+    COLLECT_INTERVAL = int(os.environ['COLLECT_INTERVAL'])
+    NUM_DAEMONS = int(os.environ['NUM_DAEMONS'])
+    SERVICE_NAME = os.environ['SERVICE_NAME']
+    K8S_NAMESPACES = os.environ['NAMESPACES'].split()
+    FROM_K8S = True if os.environ['FROM_K8S'].lower() == 'true' else False
+    DATA_DIR = PROJECT_BASE / os.environ['OUTPUT_DIR']
+else:
+    MONITOR_PORT = 80
+    COLLECT_INTERVAL = 5
+    NUM_DAEMONS = 1
+    SERVICE_NAME = 'monitor'
+    K8S_NAMESPACES = ''
+    FROM_K8S = False
+    DATA_DIR = PROJECT_BASE / 'output'
 
 ## CLI configuration
 CLI_PORT = 9880
@@ -37,8 +59,6 @@ COLLECTOR_HEALTH_CHECK_PORT = 9882
 DISK_PARTITION = 'sda'
 
 # Directories
-PROJECT_BASE = Path(__file__).absolute().parent.parent
-DATA_DIR = PROJECT_BASE / os.environ['OUTPUT_DIR']
 
 ## Logger path
 LOG_PATH = DATA_DIR / 'logs'
