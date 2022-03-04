@@ -4,14 +4,30 @@ from dataclasses import dataclass
 
 import logging
 import sys
+import os
+
+def _check_environ(var: str) -> bool:
+    return var in os.environ
+
+VARS = (
+    'MONITOR_PORT',
+    'NUM_DAEMONS',
+    'SERVICE_NAME',
+    'COLLECT_INTERVAL',
+    'OUTPUT_DIR',
+)
+
+for var in VARS:
+    if not _check_environ(var):
+        raise EnvironmentError(f'Missing {var} env. var.')
 
 LOGGING_LEVEL = logging.INFO
 
 ## Monitors configuration
-MONITOR_PORT = 80
-COLLECT_INTERVAL = 5
-NUM_DAEMONS = 1
-SERVICE_NAME = 'MONITOR_DOMAIN'
+MONITOR_PORT = int(os.environ['MONITOR_PORT'])
+COLLECT_INTERVAL = int(os.environ['COLLECT_INTERVAL'])
+NUM_DAEMONS = int(os.environ['NUM_DAEMONS'])
+SERVICE_NAME = os.environ['SERVICE_NAME']
 
 ## CLI configuration
 CLI_PORT = 9880
@@ -22,7 +38,7 @@ DISK_PARTITION = 'sda'
 
 # Directories
 PROJECT_BASE = Path(__file__).absolute().parent.parent
-DATA_DIR = PROJECT_BASE / 'output'
+DATA_DIR = PROJECT_BASE / os.environ['OUTPUT_DIR']
 
 ## Logger path
 LOG_PATH = DATA_DIR / 'logs'

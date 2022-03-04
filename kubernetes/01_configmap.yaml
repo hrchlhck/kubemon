@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubemon-env
+  namespace: kubemon
+data:
+  SERVICE_NAME: "monitor"
+  NUM_DAEMONS: "3"
+  COLLECT_INTERVAL: "5"
+  MONITOR_PORT: "80"
+  OUTPUT_DIR: "output"

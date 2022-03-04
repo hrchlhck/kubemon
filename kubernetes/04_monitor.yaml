@@ -39,6 +39,9 @@ spec:
           ports:
             - name: http
               containerPort: 80
+          envFrom:
+          - configMapRef:
+              name: kubemon-env
       volumes:
       - name: sys
         hostPath:

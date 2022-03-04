@@ -11,14 +11,15 @@ spec:
   - name: kubemon-collector
     image: vpemfh7/kubemon:latest
     imagePullPolicy: IfNotPresent
-    args: ["-t", "collector", "-H", "$(POD_IP)", "-n", "4", "-p", "9822"]
+    args: ["-t", "collector", "-H", "$(POD_IP)", "-p", "9822"]
     env:
     - name: POD_IP
       valueFrom:
         fieldRef:
           fieldPath: status.podIP
-    - name: MONITOR_DOMAIN
-      value: monitor
+    envFrom:
+    - configMapRef:
+        name: kubemon-env
     ports:
     - name: handler
       containerPort: 9822

@@ -1,18 +1,18 @@
 from kubemon.settings import Volatile
 
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
+from requests import get as rget
 
 import socket
 import pickle
 import fcntl
 import struct
 import psutil
-import os
 
 Volatile.set_procfs(psutil.__name__)
 
-__all__ = ['receive', 'send_to', 'get_default_nic', 'get_host_ip', 'is_alive', 'gethostname']
+__all__ = ['receive', 'send_to', 'get_default_nic', 'get_host_ip', 'is_alive', 'gethostname', 'get_json']
 
 def receive(_socket: socket.socket, encoding_type='utf8', buffer_size=1024) -> str:
     """ 
@@ -102,14 +102,16 @@ def gethostname() -> str:
             return fp.read().strip()
     return socket.gethostname()
 
-def _check_service(service_name: str) -> bool:
-    if service_name in os.environ:
-        return True
-    return False
-
 def nslookup(addr: str, port: int) -> List[str]:
     try:
         sockets = socket.getaddrinfo(addr, port)
         return [s[-1][0] for s in sockets if s[1] == socket.SOCK_STREAM]
     except socket.gaierror:
         return []
+
+def get_json(url: str) -> Tuple[dict, int]:
+    req = rget(url)
+
+    if req.status_code == 200:
+        return req.json(), req.status_code
+    return dict(), req.status_code
