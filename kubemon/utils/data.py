@@ -11,7 +11,8 @@ __all__ = ['subtract_dicts', 'merge_dict', 'filter_dict', 'in_both']
 def subtract_dicts(dict1: dict, dict2: dict, operation=lambda x, y: x-y) -> dict:
     """ Subtracts values from dict1 and dict2 """
     if len(dict1) != len(dict2):
-        raise KeyError("Mapping key not found")
+        missing_keys = set(dict1.keys()) ^ set(dict2.keys())
+        raise KeyError(f"Mapping keys {missing_keys} not found")
     values = map(lambda _dict: reduce(operation, _dict),
                  zip(dict2.values(), dict1.values()))
     return dict(zip(dict1.keys(), map(lambda n: round(n, 4), values)))

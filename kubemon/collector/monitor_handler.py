@@ -7,9 +7,9 @@ from typing import Any, Dict, List
 
 from kubemon.settings import START_MESSAGE, COLLECT_INTERVAL
 from kubemon.utils.data import save_csv, subtract_dicts, in_both
-from kubemon.utils.networking import receive, send_to
+from kubemon.utils.networking import receive, send_to, get_json
 
-import requests
+
 import socket
 
 class MonitorHandler(Thread):
@@ -39,7 +39,7 @@ class MonitorHandler(Thread):
     def _collect_per_path(self, paths: List[str]) -> Dict[str, Dict[str, Any]]:
         result = dict()
         for path in paths:
-            json = requests.get(path).json()
+            json, _ = get_json(path)
             result.update(json)
         return result
     

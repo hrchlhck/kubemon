@@ -10,12 +10,12 @@ class Pair:
     container: Container
     name: str
 
-@dataclass
+@dataclass(frozen=True)
 class Pod:
     """ Dataclass to represent a pod from kubernetes """
     namespace: str
     name: str
-    container: str
+    container_name: str
     pod_id: str
     container_id: str
     container: Container
