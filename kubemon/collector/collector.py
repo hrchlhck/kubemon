@@ -1,13 +1,12 @@
 from kubemon.collector.commands import COMMAND_CLASSES, HelpCommand
 from kubemon.collector.monitor_handler import MonitorHandler
 from kubemon.log import create_logger
-from kubemon.utils.networking import nslookup, receive, send_to, _check_service
+from kubemon.utils.networking import nslookup, receive, send_to, get_json
 from kubemon.settings import ( 
     CLI_PORT,
     COLLECTOR_HEALTH_CHECK_PORT,
     MONITOR_PORT,
     SERVICE_NAME,
-    Volatile
 )
 
 from typing import Dict, List
@@ -188,33 +187,37 @@ class Collector(threading.Thread):
 
         self._listen_monitor_handler()
 
+    def _check_new_services(self, new_svc: List[str]) -> List[str]:
+        if not new_svc:
+            return []
+
+        current_daemons = list(self.__daemons.values())
+        return set(new_svc) - set(current_daemons)
+
     def __probe_for_daemons(self) -> None:
         self._wait_alive()
 
-        if not _check_service(SERVICE_NAME):
-            raise EnvironmentError(f'Missing \'{SERVICE_NAME}\' env. var')
-
-        svc_name = os.environ[SERVICE_NAME]
-
         while True:
+            sleep(1)
+            services = nslookup(SERVICE_NAME, MONITOR_PORT)
 
-            sleep(3)
-            services = nslookup(svc_name, MONITOR_PORT)
+            new_services = self._check_new_services(services)
+            if not new_services:
+                continue
 
-            for service in services:
+            for service in new_services:
                 url = f'http://{service}:{MONITOR_PORT}'
 
-                resp = requests.get(url)
+                json, status_code = get_json(url)
 
-                if resp.status_code != 200:
+                if status_code != 200:
                     self.logger.info(f'Monitor {service} could not be registered.')
-                    self.logger.info(f'Status code: {resp.status_code}')
+                    self.logger.info(f'Status code: {status_code}')
                     continue
 
-                resp = resp.json()
-                host_str = f'{resp["hostname"]}@{service}:{MONITOR_PORT}'
+                host_str = f'{json["hostname"]}@{service}:{MONITOR_PORT}'
                 
-                status = self._add_monitor(f'{service}:{MONITOR_PORT}', resp['hostname'])
+                status = self._add_monitor(f'{service}:{MONITOR_PORT}', json['hostname'])
 
                 if status:
                     self.logger.info(f'Registered monitor {host_str}')
@@ -222,7 +225,7 @@ class Collector(threading.Thread):
                     self.set_metric_paths(url)
 
                     with self.mutex:
-                        self.__daemons[resp['hostname']] = service
+                        self.__daemons[json['hostname']] = service
 
 
 
