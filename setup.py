@@ -5,6 +5,8 @@ SHORT_DESCRIPTION = 'A tool for distributed container monitoring over Kubernetes
 REQUIRES = [
     'requests', 'psutil', 
     'docker', 'flask',
+    'flask_restful',
+    'gunicorn',
 ]
 
 def _load_readme() -> str:
