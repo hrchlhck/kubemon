@@ -1,2 +1,4 @@
 theme: jekyll-theme-minimal
+title: Kubemon
+description: A tool for distributed container monitoring over Kubernetes. 
 markdown: GFM
