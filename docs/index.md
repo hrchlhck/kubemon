@@ -3,7 +3,7 @@
 A tool for distributed container monitoring over Kubernetes.
 
 ## Translations
-- [Português](../assets/README-pt-br.md)
+- [Português](/assets/README-pt-br.md)
 
 ## Table of contents
 - [Environment Requirements](#environment-requirements)
@@ -32,7 +32,7 @@ A tool for distributed container monitoring over Kubernetes.
 - [flask](https://github.com/pallets/flask)
 ## Illustrations
 Basic diagram
-![Kubemon diagram](../assets/diagram-en.svg)
+![Kubemon diagram](/assets/diagram-en.svg)
 
 ## Main functionalities
 - Collects metrics from operating system, Docker containers and processes created by the container
