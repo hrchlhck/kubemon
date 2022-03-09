@@ -8,9 +8,7 @@
 
 name: Upload Kubemon
 
-on:
-  release:
-    types: [published]
+on: push
 
 jobs:
   deploy:
