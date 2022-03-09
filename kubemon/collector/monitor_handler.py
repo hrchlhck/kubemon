@@ -90,13 +90,15 @@ class MonitorHandler(Thread):
                     self._log.info(f'Started collecting data from {name}@{addr}')
 
                     while not self._collector.stop_request:
-                        if self._collector.stop_request:
-                            self._log.info(f'Stopped for {name}@{addr}')
-                            break
-
+                            
                         self._collect(self.paths)
 
                         if self._collector.stop_request:
-                            self._log.info('Releasing the barrier. %s left to release', self._collector.barrier._value)
+                            self._log.info('Releasing the barrier.')
                             self._collector.barrier.release()
+                        
+                        if not self._collector.stop_request:
+                            self._collector.loop_barrier.wait()
+                            
+
 

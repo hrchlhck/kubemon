@@ -37,12 +37,14 @@ class StartCommand(Command):
     @newline_decorator
     def execute(self) -> str:
         collector = self._collector
-
-        # if not len(collector.instances):
-        #     return "There are no connected monitors to be started.\n"
         
         if not collector.dir_name:
-            return "Argument 'dir_name' is missing.\n"
+            return "Argument 'dir_name' is missing."
+
+        # Check if the number of daemons connected to collector 
+        # are the number expected by Volatile.NUM_DAEMONS
+        if Volatile.NUM_DAEMONS != len(collector):
+            return f"{Volatile.NUM_DAEMONS} daemon(s) expected. There are connected only {len(collector)}."
 
         for sockfd in collector._monitor_sockets:
             send_to(sockfd, START_MESSAGE)

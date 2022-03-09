@@ -1,12 +1,20 @@
 from kubemon.collector.commands import IsAliveCommand, COMMAND_CLASSES
-from kubemon.utils.networking import receive, send_to
+from kubemon.utils.networking import receive, send_to, is_alive
 from kubemon.settings import COLLECTOR_HEALTH_CHECK_PORT
 
 from typing import Any
+from time import sleep
 
 import socket
 
 __all__ = ["CollectorClient"]
+
+def _check_alive(address: str, port: int) -> None:
+    print('Waiting for collector to be alive')
+    while not is_alive(address, port):
+        sleep(1)
+    else:
+        print('Collector is alive!')
 
 class ExecCommand:
     def __init__(self, address: str, port: int, cmd: str):
@@ -61,6 +69,8 @@ class CollectorClient:
         return self.__port
 
     def run(self) -> None:
+        _check_alive(self.address, COLLECTOR_HEALTH_CHECK_PORT)
+
         sockfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sockfd.connect((self.address, self.port))
 

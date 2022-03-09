@@ -7,6 +7,7 @@ from kubemon.settings import (
     COLLECTOR_HEALTH_CHECK_PORT,
     MONITOR_PORT,
     SERVICE_NAME,
+    Volatile
 )
 
 from typing import Dict, List
@@ -41,6 +42,7 @@ class Collector(threading.Thread):
         self.__running_since = None
         self.__daemons = dict()
         self.barrier = threading.Semaphore(0)
+        self.loop_barrier = threading.Barrier(Volatile.NUM_DAEMONS)
         self.stop_request = False
         self.is_running = False
         self.logger = LOGGER

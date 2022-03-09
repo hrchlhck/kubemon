@@ -81,10 +81,12 @@ if not LOG_PATH.exists():
 if not DATA_PATH.exists():
     DATA_PATH.mkdir()
 
+nd = NUM_DAEMONS
+
 @dataclass
 class Volatile:
     PROCFS_PATH: str = '/procfs'
-    NUM_DAEMONS: int = 1
+    NUM_DAEMONS: int = nd
 
     def set_procfs(module: str) -> None:
         sys.modules[module].PROCFS_PATH = Volatile.PROCFS_PATH

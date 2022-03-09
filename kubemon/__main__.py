@@ -20,10 +20,6 @@ if __name__ == "__main__":
         settings.Volatile.set_procfs()
         LOGGER.info("PROCFS_PATH set to %s", '/proc')
     
-    if args.num_daemons:
-        settings.Volatile.NUM_DAEMONS = int(args.num_daemons)
-        LOGGER.info("NUM_DAEMONS set to %s", args.num_daemons)
-
     module = get_module(args.type, args.host, int(args.port))
 
     if module == None:
