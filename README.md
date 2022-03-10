@@ -13,9 +13,9 @@ A tool for distributed container monitoring over Kubernetes.
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Running](#running)
-    - [Collector](#collector)
-    - [Monitor](#monitor)
-    - [CLI](#cli)
+    - [Starting](#starting)
+    - [Stopping](#stopping)
+    - [Commands](#all-the-cli-commands)
 - [References](#references)
 
 ## Environment requirements
@@ -23,6 +23,7 @@ A tool for distributed container monitoring over Kubernetes.
 - Kubernetes v1.19
 - Docker v19.03.13
 - Python 3.8
+- GNU Make 4.2.1
 
 ## Application requirements
 - [psutil](https://github.com/giampaolo/psutil)
@@ -38,9 +39,12 @@ Basic diagram
 ![Kubemon diagram](./assets/diagram-en.svg)
 
 ## Main functionalities
+- Collect data within the provider domain
+- The data are collected within Kubernetes Pods
+- Can be configured through Kubernetes environment variables
 - Collects metrics from operating system, Docker containers and processes created by the container
 - Send the collected metrics to the ```collector``` module, which saves the data in a CSV file
-- Can be controlled remotely by a basic CLI
+- Can be controlled remotely by either a basic CLI or Python API
 
 ### Collected metrics
 For more information about the collected metrics, please refer to:
@@ -138,7 +142,7 @@ $ make cli host=10.0.1.2
 Waiting for collector to be alive
 Collector is alive!
 >>> start test000
-Starting 2 daemons and saving data at 10.0.1.3:/home/kubemon/output/data/test000
+Starting 2 daemons and saving data at 10.0.1.2:/home/kubemon/output/data/test000
 ```
 
 Example by using the CLI API within Python:
@@ -148,7 +152,7 @@ Example by using the CLI API within Python:
 >>> 
 >>> cc = CollectorClient('10.0.1.2', CLI_PORT)
 >>> cc.start('test000')
-Starting 2 daemons and saving data at 10.0.1.3:/home/kubemon/output/data/test000
+Starting 2 daemons and saving data at 10.0.1.2:/home/kubemon/output/data/test000
 ```
 
 ### Stopping
