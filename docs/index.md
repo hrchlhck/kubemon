@@ -1,9 +1,8 @@
-## Welcome to GitHub Pages
-
+# kubemon
 A tool for distributed container monitoring over Kubernetes.
 
 ## Translations
-- [Português](/assets/README-pt-br.md)
+- [Português](/index-pt-br.md)
 
 ## Table of contents
 - [Environment Requirements](#environment-requirements)
@@ -12,10 +11,11 @@ A tool for distributed container monitoring over Kubernetes.
 - [Main Functionalities](#main-functionalities)
     - [Collected Metrics](#collected-metrics)
 - [Installation](#installation)
+- [Configuration](#configuration)
 - [Running](#running)
-    - [Collector](#collector)
-    - [Monitor](#monitor)
-    - [CLI](#cli)
+    - [Starting](#starting)
+    - [Stopping](#stopping)
+    - [Commands](#all-the-cli-commands)
 - [References](#references)
 
 ## Environment requirements
@@ -23,6 +23,7 @@ A tool for distributed container monitoring over Kubernetes.
 - Kubernetes v1.19
 - Docker v19.03.13
 - Python 3.8
+- GNU Make 4.2.1
 
 ## Application requirements
 - [psutil](https://github.com/giampaolo/psutil)
@@ -30,14 +31,20 @@ A tool for distributed container monitoring over Kubernetes.
 - [docker-py](https://github.com/docker/docker-py)
 - [virtualenv](https://github.com/pypa/virtualenv)
 - [flask](https://github.com/pallets/flask)
+- [flask_restfull](https://github.com/flask-restful/flask-restful)
+- [gunicorn](https://github.com/benoitc/gunicorn)
+
 ## Illustrations
 Basic diagram
-![Kubemon diagram](/assets/diagram-en.svg)
+![Kubemon diagram](https://raw.githubusercontent.com/hrchlhck/kubemon/main/assets/diagram-en.svg)
 
 ## Main functionalities
+- Collect data within the provider domain
+- The data are collected within Kubernetes Pods
+- Can be configured through Kubernetes environment variables
 - Collects metrics from operating system, Docker containers and processes created by the container
 - Send the collected metrics to the ```collector``` module, which saves the data in a CSV file
-- Can be controlled remotely by a basic CLI
+- Can be controlled remotely by either a basic CLI or Python API
 
 ### Collected metrics
 For more information about the collected metrics, please refer to:
@@ -82,97 +89,106 @@ For more information about the collected metrics, please refer to:
 | Network | Bytes <br> Bytes <br> Packets <br> Packets | Sent <br> Received <br> Sent <br> Received |
 
 ## Installation
-Before installing the tool, make sure Kubernetes and Docker are properly installed in the system. Besides, the tool must be downloaded and extracted in each Kubernetes node to properly monitor the metrics of the cluster.
+Before installing Kubemon, make sure Kubernetes and Docker are properly installed in the system.
 
-1. Download the latest version here: [kubemon v2.0.0](https://github.com/hrchlhck/kubemon/archive/refs/tags/v2.0.0.zip) 
+1. Download the latest version here: [kubemon v2.2.0](https://github.com/hrchlhck/kubemon/archive/refs/tags/v2.2.0.zip) 
 
 2. Extract the zip file and go on the extracted directory
 
-3. Create a virtual environment and activate it
+3. Update the ```nodeName``` field in ```kubernetes/04_collector.yaml``` to your the name of your Kubernetes control-plane node.
+
+4. Apply the Kubernetes objects within ```kubernetes/```:
     ```sh
-    $ python3 -m venv venv 
-    $ source venv/bin/activate
+    $ kubectl apply -f kubernetes/
+    namespace/kubemon created
+    configmap/kubemon-env created
+    persistentvolume/kubemon-volume created
+    persistentvolumeclaim/kubemon-volume-claim created
+    service/collector created
+    service/monitor created
+    pod/collector created
+    daemonset.apps/kubemon-monitor created
     ```
 
-4. Install packages
-    ```sh 
-    (venv) $ pip install .
-    ```
+The following subsection will detail about how to configure and execute the data collecting process.
 
-## Running
-The collected metrics will be saved in the ```client``` machine (See [Client](#Illustrations) in the diagram) by default in ```/tmp/data```. This setting can be changed in ```./kubemon/constants.py``` by changing ```ROOT_DIR``` variable value.
+## Configuration
+Kubemon has a few variables that can be defined by the user. For instance, some of the required fields to be configured before running the tool is ```NUM_DAEMONS```, which denotes the expected amount of ```client``` instances should be connected to the ```collector``` component. In addition, the Kubemon components are configured through environment variables inside the Kubernetes pods.
+
+The configuration file is at ```kubernetes/01_configmap.yaml```. At the current version of Kubemon, the configmap lists all the configurable variables. You can update according to your needs.
+
+The collected metrics will be saved in the Kubernetes control-plane node by default, in ```/mnt/kubemon-data```. This setting can be changed in ```./kubernetes/02_volumes.yaml``` by updating the ```hostPath``` field. 
 
 Example: 
-```python
+```yaml
 # Before
-ROOT_DIR = "/tmp/data"
-
-# After
-ROOT_DIR = "/home/user/Documents/data"
-```
-
-In the further subsections will be teaching how to execute this tool.
-
-A brief command list:
-```sh
-usage: kubemon [-h] [-l] [-t TYPE] [-H IP] [-p PORT] [-f FILE1 FILE2] [-c [COMMAND ...]] [-i INTERVAL]
-
-Kubemon commands
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -l, --list            Lists all available modules
-  -t TYPE, --type TYPE  Functionality of sys-monitor. E.g. collector, monitor, merge...
-  -H IP, --host IP      Host that any of sys-monitor functions will be connecting
-  -p PORT, --port PORT  Port of the host
-  -f FILE1 FILE2, --files FILE1 FILE2
-                        Files for merge
-  -c [COMMAND ...], --command [COMMAND ...]
-                        Command for be executing on CollectorClient
-  -i INTERVAL, --interval INTERVAL
-                        Data collection rate by monitors
-```
-### Collector
-```sh
-(venv) $ make collector
-[ Collector ] Started collector CLI at 0.0.0.0:9880
-[ Collector ] Started collector at 0.0.0.0:9822
-```
-
-### Monitor
-Assuming that the collector IP is ```192.168.0.3```, let's connect the monitors to it.
-
-There are three types of monitors:
-1. OSMonitor - Collects Operating System metrics
-2. DockerMonitor - Collects Docker metrics
-3. ProcessMonitor - Collects container processes metrics
-
-**The tool must be executed as ```sudo``` because some metrics (e.g. network, disk, ...) are available only for super users.**
-
-### In this case, let's run all the monitors at once:
-```sh
-(venv) $ sudo python -m kubemon -t all -H 192.168.0.3
-Connected OSMonitor_192_168_0_3_node_0 monitor to collector
 ...
+hostPath:
+    path: "/mnt/kubemon-data"
+    
+# After
+...
+hostPath:
+    path: "/home/user/data"
 ```
 
-### CLI
-Assuming the same IP address for the collector in the section [Monitor](#monitor), the port to communicate with the ```collector``` via CLI is ```9880```.
+## Running
+### Starting
+To start the collecting process, you can either start the CLI or execute commands within Python. 
 
-There are two commands available so far:
-1. ```/instances``` - Number of monitor instances connected to the ```collector``` object.
-2. ```/start <output_dir>``` - Start the monitors and setting up the output directory to save the files
-
-### Checking how many instances are connected
+Example with the CLI:
 ```sh
-(venv) $ python -m kubemon -t cli -H 192.168.0.3 -c /instances
-Connected instances: 5
+$ make cli host=10.0.1.2
+Waiting for collector to be alive
+Collector is alive!
+>>> start test000
+Starting 2 daemons and saving data at 10.0.1.2:/home/kubemon/output/data/test000
 ```
 
-### Starting monitors. In this case the CSV files will be saved at ```/tmp/data/test00/```
+Example by using the CLI API within Python:
+```python
+>>> from kubemon.collector import CollectorClient
+>>> from kubemon.settings import CLI_PORT
+>>> 
+>>> cc = CollectorClient('10.0.1.2', CLI_PORT)
+>>> cc.start('test000')
+Starting 2 daemons and saving data at 10.0.1.2:/home/kubemon/output/data/test000
+```
+
+### Stopping
+
+Within the CLI:
 ```sh
-(venv) $ python -m kubemon -t cli -H 192.168.0.3 -c /start "test00"
-Started 5 monitors
+>>> stop
+Stopped collector
+```
+
+Using the API:
+```python
+...
+>>> cc.stop()
+Stopped collector
+```
+
+### All the CLI commands:
+You can retrieve all the implemented commands by either typing ```help``` within the CLI prompt or by running ```.help()``` method from the API.
+
+All the commands:
+```
+'start': Start collecting metrics from all connected daemons in the collector.
+
+    Args:
+        - Directory name to be saving the data collected. Ex.: start test000
+    
+'instances': Lists all the connected monitor instances.
+    
+'daemons': Lists all the daemons (hosts) connected.
+    
+'stop': Stop all monitors if they're running.
+    
+'help': Lists all the available commands.
+    
+'alive': Tells if the collector is alive.
 ```
 
 ## References
