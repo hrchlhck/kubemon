@@ -6,8 +6,6 @@ import logging
 import sys
 import os
 
-import psutil
-
 def _check_environ(var: str) -> bool:
     return var in os.environ
 
@@ -25,14 +23,9 @@ LOGGING_LEVEL = logging.INFO
 PROJECT_BASE = Path(__file__).absolute().parent.parent
 
 if 'WITHIN_DOCKER' in os.environ:
-
-    p = psutil.Process(os.getpid())
-    p.nice(-20)
-
     for var in VARS:
         if not _check_environ(var):
             raise EnvironmentError(f'Missing {var} env. var.')
-
 
     ## Monitors configuration
     MONITOR_PORT = int(os.environ['MONITOR_PORT'])
