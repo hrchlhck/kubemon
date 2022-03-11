@@ -66,7 +66,7 @@ class InstancesCommand(Command):
 
         if req.status_code != 200:
             return ''
-        return req.json()
+        return req.json()['total']
 
     @lru_cache
     @newline_decorator
@@ -88,9 +88,9 @@ class InstancesCommand(Command):
 
                 req = req.json()
 
-                instances_per_module = {module: len(self._instances_per_daemon(module, url)) for module in req['metric_paths']}
+                instances_per_module = {module: self._instances_per_daemon(module, url) for module in req['metric_paths']}
                 total_per_daemon = sum(i for i in instances_per_module.values())
-                total += total_per_daemon
+                total += req['total']
                 message += f'Instances in {hostname}@{addr}: {total_per_daemon}\n'
 
                 # Listing number of instances per module, per daemon

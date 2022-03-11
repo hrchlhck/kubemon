@@ -23,6 +23,7 @@ from . import (
     ProcessMonitor
 )
 
+import requests
 import psutil
 import docker
 import flask
@@ -33,26 +34,36 @@ LOGGER = create_logger('daemon')
 APP = flask.Flask(__name__)
 API = Api(APP)
 
-def _jsonify(instances: list) -> Dict[str, dict]:
-    instances = {str(i): i.get_stats() for i in instances}
-
-    return flask.jsonify(instances)
+def _get_stats(instances: list) -> Dict[str, dict]:
+    return {str(i): i.get_stats() for i in instances}
 
 class ROS(Resource):
     def get(self):
-        return flask.make_response(_jsonify([OSMonitor()]), 200)
+        instances = {
+           'total': 1,
+           'instances': _get_stats([OSMonitor()])
+       }
+        return flask.make_response(flask.jsonify(instances), 200)
 
 class RDocker(Resource):
     def get(self):
         client = docker.from_env()
         instances = docker_instances(client)
-        return flask.make_response(_jsonify(instances), 200)
+        instances = {
+           'total': len(instances),
+           'instances': _get_stats(instances)
+        }
+        return flask.make_response(flask.jsonify(instances), 200)
 
 class RProcess(Resource):
     def get(self):
        client = docker.from_env()
        instances = process_instances(client)
-       return flask.make_response(_jsonify(instances), 200)
+       instances = {
+           'total': len(instances),
+           'instances': _get_stats(instances)
+       }
+       return flask.make_response(flask.jsonify(instances), 200)
 
 class RHome(Resource):
     def get(self):
@@ -60,6 +71,7 @@ class RHome(Resource):
         data = {
             'hostname': str(OSMonitor()),
             'metric_paths': [flask.url_for(i) for i in list_monitors(_MODULES)],
+            'total': sum(requests.get(flask.request.base_url + m).json()['total'] for m in list_monitors(_MODULES))
         }
         return flask.jsonify(data)
 

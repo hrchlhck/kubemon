@@ -39,7 +39,7 @@ class MonitorHandler(Thread):
     def _collect_per_path(self, paths: List[str]) -> Dict[str, Dict[str, Any]]:
         result = dict()
         for path in paths:
-            json, _ = get_json(path)
+            json, _ = get_json(path)['instances']
             result.update(json)
         return result
     
