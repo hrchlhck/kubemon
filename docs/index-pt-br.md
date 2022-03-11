@@ -89,7 +89,7 @@ Para mais informações a respeito das métricas coletadas, por favor recorra a:
 ## Instalação
 Antes de definitivamente instalar o Kubemon, verifique se o Kubernetes e o Docker estão propriamente instalados no sistema.
 
-1. Baixe a última versão aqui: [kubemon v2.2.1](https://github.com/hrchlhck/kubemon/archive/refs/tags/v2.2.1.zip) 
+1. Baixe a última versão aqui: [kubemon](https://github.com/hrchlhck/kubemon/zipball/main) 
 
 2. Extraia o arquivo ```.zip```  e entre no diretório extraído.
 
