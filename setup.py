@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '2.2.0'
+VERSION = '2.2.1'
 SHORT_DESCRIPTION = 'A tool for distributed container monitoring over Kubernetes'
 REQUIRES = [
     'requests', 'psutil', 
