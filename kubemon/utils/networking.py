@@ -110,7 +110,7 @@ def nslookup(addr: str, port: int) -> List[str]:
         return []
 
 def get_json(url: str) -> Tuple[dict, int]:
-    req = rget(url)
+    req = rget(url, timeout=30)
 
     if req.status_code == 200:
         return req.json(), req.status_code
