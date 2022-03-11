@@ -91,14 +91,11 @@ class MonitorHandler(Thread):
 
                     while not self._collector.stop_request:
                             
+                        if not self._collector.stop_request:
+                            self._collector.loop_barrier.wait()
+
                         self._collect(self.paths)
 
                         if self._collector.stop_request:
                             self._log.info('Releasing the barrier.')
                             self._collector.barrier.release()
-                        
-                        if not self._collector.stop_request:
-                            self._collector.loop_barrier.wait()
-                            
-
-
