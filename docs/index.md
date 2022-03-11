@@ -36,7 +36,7 @@ A tool for distributed container monitoring over Kubernetes.
 
 ## Illustrations
 Basic diagram
-![Kubemon diagram](/assets/diagram-en.svg)
+![Kubemon diagram](https://raw.githubusercontent.com/hrchlhck/kubemon/main/assets/diagram-en.svg)
 
 ## Main functionalities
 - Collect data within the provider domain
