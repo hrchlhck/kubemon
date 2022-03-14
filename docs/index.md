@@ -2,7 +2,7 @@
 A tool for distributed container monitoring over Kubernetes.
 
 ## Translations
-- [Português](/index-pt-br.md)
+- [Português](/pt-br)
 
 ## Table of contents
 - [Environment Requirements](#environment-requirements)
