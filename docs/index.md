@@ -1,13 +1,8 @@
----
-layout: post
-markdown: GFM
----
-
 # kubemon
 A tool for distributed container monitoring over Kubernetes.
 
 ## Translations
-- [Português](/pt-br)
+- [Português](/kubemon/pt-br)
 
 ## Table of contents
 - [Environment Requirements](#environment-requirements)
