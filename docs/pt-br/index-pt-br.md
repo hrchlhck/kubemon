@@ -1,3 +1,7 @@
+---
+permalink: /pt-br/
+---
+
 # kubemon
 Uma ferramenta para monitoramento de containers distribuídos no Kubernetes.
 
