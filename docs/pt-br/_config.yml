@@ -2,4 +2,4 @@ theme: jekyll-theme-minimal
 title: Kubemon
 description: Uma ferramenta para monitoramento de containers distribuídos no Kubernetes.
 markdown: GFM
-permalink: /pt-br/
+permalink: /:path/pt-br/
