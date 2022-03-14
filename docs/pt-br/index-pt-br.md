@@ -17,6 +17,7 @@ Uma ferramenta para monitoramento de containers distribuídos no Kubernetes.
     - [Iniciando](#iniciando)
     - [Parando](#parando)
     - [Comandos](#todos-os-comandos)
+- [Vídeo Demonstrativo](#video-demonstrativo)
 - [Referências](#referencias)
 
 ## Dependências de Ambiente
@@ -190,6 +191,11 @@ Todos os comandos:
     
 'alive': Tells if the collector is alive.
 ```
+
+## Video Demonstrativo
+Para assistir o vídeo, basta clicar na imagem a seguir.
+
+[![Imagem do Video](https://img.youtube.com/vi/QwlOn1gwLpA/1.jpg)](https://youtu.be/QwlOn1gwLpA)
 
 ## Referências
 - [Block layer statistics](https://www.kernel.org/doc/html/latest/block/stat.html)
