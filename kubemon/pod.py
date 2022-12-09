@@ -19,7 +19,7 @@ def to_pod(container: Container) -> Pod:
 
     return Pod(fields[3], fields[2], fields[1], fields[4], container.id, container)
 
-def list_pods(*namespaces, client=None, except_namespace='kube-system', from_k8s=True) -> List[Pod]:
+def list_pods(*namespaces, client=None, from_k8s=True) -> List[Pod]:
     if client == None:
         client = docker.from_env()
     elif not isinstance(client, docker.client.DockerClient):
@@ -37,12 +37,10 @@ def list_pods(*namespaces, client=None, except_namespace='kube-system', from_k8s
 
     # Get pods from a list of namespaces.
     # Otherwise, it returns all pods from all namespaces
-    if not namespaces[0] == '*':
-        containers = [c 
-            for c in containers 
-            for namespace in namespaces 
-            if namespace in c.name \
-            and except_namespace not in c.name
-        ]
+    containers_new = list()
+    for c in containers:
+        for ns in namespaces:
+            if ns in c.name:
+                containers_new.append(c)
 
-    return list(map(to_pod, containers))
+    return list(map(to_pod, containers_new))
