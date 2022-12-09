@@ -6,7 +6,7 @@ metadata:
   labels:
     app: collector
 spec:
-  nodeName: projsec01
+  nodeName: master
   volumes:
     - name: data
       persistentVolumeClaim:

@@ -8,6 +8,9 @@ build:
 clean:
 	sudo rm -rf $(shell find . -name __pycache__)
 
+push:
+	./push.sh
+
 collector:
 	docker run \
 	-p 9822:9822/tcp \
@@ -24,8 +27,10 @@ collector:
 cli:
 	docker run \
 	--rm \
+	--privileged \
 	--name monitor \
 	-it \
+	-e LOG_LEVEL=debug \
 	vpemfh7/kubemon:latest \
 	-H $(host) \
 	-t cli \

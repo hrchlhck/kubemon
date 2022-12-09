@@ -17,6 +17,7 @@ spec:
       containers:
         - name: kubemon-monitor
           image: vpemfh7/kubemon:latest
+          imagePullPolicy: IfNotPresent
           args: ["-t", "daemon", "-H", "collector"]
           securityContext:
             privileged: true
