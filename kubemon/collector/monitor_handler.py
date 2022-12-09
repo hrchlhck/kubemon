@@ -22,6 +22,7 @@ class MonitorHandler(Thread):
         self.paths = ""
 
         Thread.__init__(self)
+        self.name = monitor_name
     
     def __str__(self) -> str:
         return self._monitor_name
