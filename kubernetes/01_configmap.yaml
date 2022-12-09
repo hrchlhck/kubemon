@@ -9,5 +9,6 @@ data:
   COLLECT_INTERVAL: "5"
   MONITOR_PORT: "80"
   OUTPUT_DIR: "output"
-  NAMESPACES: "k8s-bigdata testbed"
+  NAMESPACES: "k8s-bigdata"
   FROM_K8S: "true"
+  LOG_LEVEL: "debug"

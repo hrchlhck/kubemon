@@ -17,9 +17,21 @@ VARS = (
     'OUTPUT_DIR',
     'NAMESPACES',
     'FROM_K8S',
+    'LOG_LEVEL',
 )
 
-LOGGING_LEVEL = logging.INFO
+log_levels = {
+    'info': logging.INFO,
+    'warning': logging.WARNING,
+    'debug': logging.DEBUG,
+}
+
+log_level_mapper = {
+    logging.INFO: 'info',
+    logging.WARNING: 'warning',
+    logging.DEBUG: 'debug',
+}
+
 PROJECT_BASE = Path(__file__).absolute().parent.parent
 
 if 'WITHIN_DOCKER' in os.environ:
@@ -35,6 +47,7 @@ if 'WITHIN_DOCKER' in os.environ:
     K8S_NAMESPACES = os.environ['NAMESPACES'].split()
     FROM_K8S = True if os.environ['FROM_K8S'].lower() == 'true' else False
     DATA_DIR = PROJECT_BASE / os.environ['OUTPUT_DIR']
+    LOGGING_LEVEL = log_levels.get(os.environ['LOG_LEVEL'], 'info')
 else:
     MONITOR_PORT = 80
     COLLECT_INTERVAL = 5
@@ -43,6 +56,7 @@ else:
     K8S_NAMESPACES = ''
     FROM_K8S = False
     DATA_DIR = PROJECT_BASE / 'output'
+    LOGGING_LEVEL = logging.WARNING
 
 ## CLI configuration
 CLI_PORT = 9880

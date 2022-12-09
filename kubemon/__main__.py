@@ -6,13 +6,17 @@ from kubemon.collector.commands import COMMAND_CLASSES
 import kubemon.settings as settings
 
 import sys
+import os
 
 if __name__ == "__main__":
+    os.nice(-20)
 
     if 'win' in sys.platform:
         raise NotLinuxException("Kubemon is only available for Linux-based Operating Systems. Sorry.")
         
     LOGGER = create_logger(__name__, level=settings.LOGGING_LEVEL)
+
+    LOGGER.info(f'Starting logger at level {settings.log_level_mapper[settings.LOGGING_LEVEL]}')
 
     args = parser.parse_args()
     
