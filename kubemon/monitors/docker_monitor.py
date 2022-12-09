@@ -146,7 +146,6 @@ class DockerMonitor(BaseMonitor):
     def __repr__(self) -> str:
         return f'<DockerMonitor - {gethostname()} - {get_host_ip()} - {self.__container.name} - {self.pid}>'
 
-    @log(logger=LOGGER)
     def get_path(self, cgroup_controller: str, stat: str) -> str:
         """ 
         Get full path of the docker container within the pod, on cgroups directory 
@@ -173,21 +172,18 @@ class DockerMonitor(BaseMonitor):
 
         return {k: Path(cgroup_path + '/' + k + v) for k, v in data if k and not k.startswith('name')}
 
-    @log(logger=LOGGER)
     def get_memory_usage(self) -> dict:
         """ Get the memory usage of a given container within a pod """
         path = self.get_path(cgroup_controller='memory', stat='memory.stat')
 
         return self._metrics['memory'](path)
 
-    @log(logger=LOGGER)
     def get_disk_usage(self) -> dict:
         """ Get the disk usage of a given container within a pod """
         path = self.get_path(cgroup_controller='blkio', stat='blkio.throttle.io_service_bytes')
        
         return self._metrics['disk'](path)
 
-    @log(logger=LOGGER)
     def get_cpu_times(self) -> dict:
         """ Get the CPU usage of a given container within a pod """
         path_cpuacct = self.get_path(cgroup_controller='cpu,cpuacct', stat='cpuacct.stat')
@@ -195,7 +191,6 @@ class DockerMonitor(BaseMonitor):
 
         return self._metrics['cpu'](path_cpuacct, path_cpu)
 
-    @log(logger=LOGGER)
     def get_net_usage(self) -> dict:
         """ Get network usage of a given container within a pod 
 
@@ -206,7 +201,6 @@ class DockerMonitor(BaseMonitor):
 
         return self._metrics['network'](self.pid)
 
-    @log(logger=LOGGER)
     def get_stats(self) -> dict:
         """ Get all metrics of a given container within a pod """
         cpu = self.get_cpu_times()
