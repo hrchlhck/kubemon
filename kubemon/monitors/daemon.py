@@ -1,4 +1,5 @@
 from functools import wraps, lru_cache
+from socket import socket
 from typing import Any, Callable, Dict, List
 from flask_restful import Resource, Api
 from gunicorn.app.base import BaseApplication
@@ -103,7 +104,7 @@ class Kubemond(BaseApplication):
                   if key in self.cfg.settings and value is not None}
 
         for k, v in config.items():
-            self.cfg.set(k.lower(), v)
+            self.cfg.set(k.lower(), v)   
 
     def load(self):
         return self.app
@@ -142,10 +143,19 @@ def process_instances(client: docker.client.DockerClient) -> List[ProcessMonitor
     monitors = list()
 
     for pid, container_obj in container_pids:
+        if pid == 0 or not pid_exists(pid):
+            LOGGER.warning(f'Skipping pid {pid} for container {container_obj.name} ')
+            continue
+
         for cpid in get_children_pids(pid):
-            if pid_exists(cpid):
-                monitor = ProcessMonitor(container_obj, cpid)
-                monitors.append(monitor)
+            try:
+                psutil.Process(cpid)
+            except psutil.NoSuchProcess:
+                LOGGER.warn('pid %s not exist', cpid)
+                continue
+            
+            monitor = ProcessMonitor(container_obj, cpid)
+            monitors.append(monitor)
 
     return monitors
 
