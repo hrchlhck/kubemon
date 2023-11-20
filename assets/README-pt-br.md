@@ -2,6 +2,7 @@
 Uma ferramenta para monitoramento de containers distribuídos no Kubernetes.
 
 ## Sumário
+- [Citação](#citação)
 - [Dependências de Ambiente](#dependências-de-ambiente)
 - [Dependências de Aplicação](#dependências-de-aplicação)
 - [Diagramas](#diagramas)
@@ -12,6 +13,15 @@ Uma ferramenta para monitoramento de containers distribuídos no Kubernetes.
     - [Monitor](#monitor)
     - [CLI](#cli)
 - [Referências](#referencias)
+
+## Citação
+```bibtex
+@article{Kubemon2023,
+    title = {Kubemon: extrator de métricas de desempenho de sistema operacional e aplicações conteinerizadas em ambientes de nuvem no domínio do provedor},
+    year = {2023},
+    author = {Pedro Horchulhack and Eduardo K. Viegas and Altair O. Santin and Felipe V. Ramos},
+}
+```
 
 ## Dependências de Ambiente
 - Ubuntu 18.04
