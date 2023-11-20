@@ -5,6 +5,7 @@ A tool for distributed container monitoring over Kubernetes.
 - [Português](./assets/README-pt-br.md)
 
 ## Table of contents
+- [Citation](#citation)
 - [Environment Requirements](#environment-requirements)
 - [Application Requirements](#application-requirements)
 - [Illustrations](#illustrations)
@@ -17,6 +18,15 @@ A tool for distributed container monitoring over Kubernetes.
     - [Stopping](#stopping)
     - [Commands](#all-the-cli-commands)
 - [References](#references)
+
+## Citation
+```bibtex
+@article{Kubemon2023,
+    title = {Kubemon: extrator de métricas de desempenho de sistema operacional e aplicações conteinerizadas em ambientes de nuvem no domínio do provedor},
+    year = {2023},
+    author = {Pedro Horchulhack and Eduardo K. Viegas and Altair O. Santin and Felipe V. Ramos},
+}
+```
 
 ## Environment requirements
 - Ubuntu 18.04
