@@ -21,10 +21,17 @@ A tool for distributed container monitoring over Kubernetes.
 
 ## Citation
 ```bibtex
-@article{Kubemon2023,
-    title = {Kubemon: extrator de métricas de desempenho de sistema operacional e aplicações conteinerizadas em ambientes de nuvem no domínio do provedor},
-    year = {2023},
-    author = {Pedro Horchulhack and Eduardo K. Viegas and Altair O. Santin and Felipe V. Ramos},
+@inproceedings{Horchulhack2023,
+  series = {SBSeg Estendido 2023},
+  title = {Kubemon: extrator de métricas de desempenho de sistema operacional e aplica\c{c}ões conteinerizadas em ambientes de nuvem no domínio do provedor},
+  url = {http://dx.doi.org/10.5753/sbseg_estendido.2023.233247},
+  DOI = {10.5753/sbseg_estendido.2023.233247},
+  booktitle = {Anais Estendidos do XXIII Simpósio Brasileiro de Seguran\c{c}a da Informa\c{c}ão e de Sistemas Computacionais (SBSeg Estendido 2023)},
+  publisher = {Sociedade Brasileira de Computa\c{c}ão - SBC},
+  author = {Horchulhack,  Pedro and Viegas,  Eduardo K. and Santin,  Altair O. and Ramos,  Felipe V.},
+  year = {2023},
+  month = sep,
+  collection = {SBSeg Estendido 2023}
 }
 ```
 
